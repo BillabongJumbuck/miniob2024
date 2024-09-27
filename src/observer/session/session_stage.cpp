@@ -57,6 +57,7 @@ void SessionStage::handle_request(SessionEvent *sev)
 
 void SessionStage::handle_request2(SessionEvent *event)
 {
+  // sql:输入cli的sql语句
   const string &sql = event->query();
   if (common::is_blank(sql.c_str())) {
     return;
