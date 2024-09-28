@@ -154,6 +154,7 @@ RC CliCommunicator::init(int fd, unique_ptr<Session> session, const string &addr
 RC CliCommunicator::read_event(SessionEvent *&event)
 {
   event         = nullptr;
+  // 从命令行读入输入
   char *command = read_command();
   if (nullptr == command) {
     return RC::SUCCESS;
@@ -169,7 +170,7 @@ RC CliCommunicator::read_event(SessionEvent *&event)
     exit_ = true;
     return RC::SUCCESS;
   }
-
+  // 创建新的SessionEvent
   event = new SessionEvent(this);
   event->set_query(string(command));
   free(command);
