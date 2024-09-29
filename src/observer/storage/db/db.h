@@ -66,6 +66,11 @@ public:
   RC create_table(const char *table_name, span<const AttrInfoSqlNode> attributes,
       const StorageFormat storage_format = StorageFormat::ROW_FORMAT);
 
+   /**
+     * @brief 删除一个表
+   */
+   RC drop_table(Table *table);
+
   /**
    * @brief 根据表名查找表
    */

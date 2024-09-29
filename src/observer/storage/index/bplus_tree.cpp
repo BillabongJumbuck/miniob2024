@@ -975,6 +975,13 @@ RC BplusTreeHandler::close()
   return RC::SUCCESS;
 }
 
+RC BplusTreeHandler::drop(){
+  // 没有实现！
+  // TODO 实现DROP
+  return RC::SUCCESS;
+}
+
+
 RC BplusTreeHandler::print_leaf(Frame *frame)
 {
   BplusTreeMiniTransaction mtr(*this);

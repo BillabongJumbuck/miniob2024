@@ -127,6 +127,35 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   return rc;
 }
 
+RC Table::drop(Table *table, const char* path){
+  RC rc = RC::SUCCESS;
+
+  // remove index
+  for(Index *index : indexes_) {
+    index->drop_index();
+  }
+
+  // destroy record_handler
+  table -> record_handler() -> close();
+  delete table->record_handler();
+  table->record_handler_ = nullptr;
+
+  // destroy buffer pool and remove data file
+  string             data_file = table_data_file(table->base_dir_.c_str(), table->name());
+  BufferPoolManager &bpm       = db_->buffer_pool_manager();
+  rc                           = bpm.drop_file(data_file.c_str());
+  // TODO ： 判断RC的类型
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("destroy buffer pool and remove data file FAILED！！！");
+    return rc;
+  };
+  // remove meta file
+  remove(table_meta_file(path, table->name()).c_str());
+  // TODO 判断remove的返回值
+
+  return  rc;
+}
+
 RC Table::open(Db *db, const char *meta_file, const char *base_dir)
 {
   // 加载元数据文件

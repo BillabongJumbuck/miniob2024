@@ -161,6 +161,18 @@ RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attribut
   return RC::SUCCESS;
 }
 
+RC Db::drop_table(Table* table){
+  RC rc = RC::SUCCESS;
+
+  // 调用table的删除接口
+  rc = table->drop(table, path_.c_str());
+
+  // 从 "当前打开的表" 中移除该项
+  opened_tables_.erase(std::string(table->name()));
+  LOG_INFO("Drop table success. table name=%s, table_id:%d", table->name(), table->table_id());
+  return rc;
+}
+
 Table *Db::find_table(const char *table_name) const
 {
   unordered_map<string, Table *>::const_iterator iter = opened_tables_.find(table_name);
