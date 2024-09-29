@@ -479,6 +479,11 @@ public:
   RC close();
 
   /**
+   * 删除掉索引文件（用于drop table时）
+   */
+  RC drop();
+
+  /**
    * @brief 此函数向IndexHandle对应的索引中插入一个索引项。
    * @details 参数user_key指向要插入的属性值，参数rid标识该索引项对应的元组，
    * 即向索引中插入一个值为（user_key，rid）的键值对

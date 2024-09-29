@@ -834,6 +834,15 @@ RC BufferPoolManager::create_file(const char *file_name)
   return RC::SUCCESS;
 }
 
+RC BufferPoolManager::drop_file(const char *file_name)
+{
+  RC rc = close_file(file_name);
+  // TODO 处理返回值
+  remove(file_name);
+  // TODO 处理remove的返回值
+  return rc;
+}
+
 RC BufferPoolManager::open_file(LogHandler &log_handler, const char *_file_name, DiskBufferPool *&_bp)
 {
   string file_name(_file_name);

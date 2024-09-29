@@ -327,6 +327,7 @@ public:
   RC init(unique_ptr<DoubleWriteBuffer> dblwr_buffer);
 
   RC create_file(const char *file_name);
+  RC drop_file(const char *file_name);
   RC open_file(LogHandler &log_handler, const char *file_name, DiskBufferPool *&bp);
   RC close_file(const char *file_name);
 
