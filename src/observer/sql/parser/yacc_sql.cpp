@@ -176,8 +176,8 @@ enum yysymbol_kind_t
   YYSYMBOL_TRX_ROLLBACK = 24,              /* TRX_ROLLBACK  */
   YYSYMBOL_INT_T = 25,                     /* INT_T  */
   YYSYMBOL_STRING_T = 26,                  /* STRING_T  */
-  YYSYMBOL_FLOAT_T = 27,                   /* FLOAT_T  */
-  YYSYMBOL_VECTOR_T = 28,                  /* VECTOR_T  */
+  YYSYMBOL_DATE_T = 27,                    /* DATE_T  */
+  YYSYMBOL_FLOAT_T = 28,                   /* FLOAT_T  */
   YYSYMBOL_HELP = 29,                      /* HELP  */
   YYSYMBOL_EXIT = 30,                      /* EXIT  */
   YYSYMBOL_DOT = 31,                       /* DOT  */
@@ -673,7 +673,7 @@ static const char *const yytname[] =
   "CREATE", "DROP", "GROUP", "TABLE", "TABLES", "INDEX", "CALC", "SELECT",
   "DESC", "SHOW", "SYNC", "INSERT", "DELETE", "UPDATE", "LBRACE", "RBRACE",
   "COMMA", "TRX_BEGIN", "TRX_COMMIT", "TRX_ROLLBACK", "INT_T", "STRING_T",
-  "FLOAT_T", "VECTOR_T", "HELP", "EXIT", "DOT", "INTO", "VALUES", "FROM",
+  "DATE_T", "FLOAT_T", "HELP", "EXIT", "DOT", "INTO", "VALUES", "FROM",
   "WHERE", "AND", "SET", "ON", "LOAD", "DATA", "INFILE", "EXPLAIN",
   "STORAGE", "FORMAT", "EQ", "LT", "GT", "LE", "GE", "NE", "NUMBER",
   "FLOAT", "ID", "SSS", "'+'", "'-'", "'*'", "'/'", "UMINUS", "$accept",
@@ -1926,15 +1926,15 @@ yyreduce:
 #line 1927 "yacc_sql.cpp"
     break;
 
-  case 42: /* type: FLOAT_T  */
+  case 42: /* type: DATE_T  */
 #line 363 "yacc_sql.y"
-               { (yyval.number) = static_cast<int>(AttrType::FLOATS); }
+               { (yyval.number) = static_cast<int>(AttrType::DATES); }
 #line 1933 "yacc_sql.cpp"
     break;
 
-  case 43: /* type: VECTOR_T  */
+  case 43: /* type: FLOAT_T  */
 #line 364 "yacc_sql.y"
-               { (yyval.number) = static_cast<int>(AttrType::VECTORS); }
+               { (yyval.number) = static_cast<int>(AttrType::FLOATS); }
 #line 1939 "yacc_sql.cpp"
     break;
 

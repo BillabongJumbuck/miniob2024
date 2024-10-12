@@ -481,7 +481,7 @@ public:
   /**
    * 删除掉索引文件（用于drop table时）
    */
-  RC drop();
+  RC drop(BufferPoolManager &bpm, const char *file_name);
 
   /**
    * @brief 此函数向IndexHandle对应的索引中插入一个索引项。

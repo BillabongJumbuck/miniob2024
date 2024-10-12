@@ -73,7 +73,7 @@ public:
    * 删除索引
    * @return
    */
-  virtual RC drop_index() = 0;
+  virtual RC drop_index(BufferPoolManager &bpm, const char *file_name) = 0;
 
   /**
    * @brief 创建一个索引数据的扫描器

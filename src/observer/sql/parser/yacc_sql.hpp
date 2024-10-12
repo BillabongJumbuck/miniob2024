@@ -78,8 +78,8 @@ extern int yydebug;
     TRX_ROLLBACK = 279,            /* TRX_ROLLBACK  */
     INT_T = 280,                   /* INT_T  */
     STRING_T = 281,                /* STRING_T  */
-    FLOAT_T = 282,                 /* FLOAT_T  */
-    VECTOR_T = 283,                /* VECTOR_T  */
+    DATE_T = 282,                  /* DATE_T  */
+    FLOAT_T = 283,                 /* FLOAT_T  */
     HELP = 284,                    /* HELP  */
     EXIT = 285,                    /* EXIT  */
     DOT = 286,                     /* DOT  */

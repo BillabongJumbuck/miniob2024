@@ -44,16 +44,15 @@ RC BplusTreeIndex::create(Table *table, const char *file_name, const IndexMeta &
   return RC::SUCCESS;
 }
 
-RC BplusTreeIndex::drop_index()
+RC BplusTreeIndex::drop_index(BufferPoolManager &bpm, const char *file_name)
 {
   if (inited_) {
     LOG_INFO("Begin to drop index, index:%s, field:%s", index_meta_.name(), index_meta_.field());
-    index_handler_.drop();
+    index_handler_.drop(bpm, file_name);
     inited_ = false;
   }
   LOG_INFO("Successfully drop index.");
   return RC::SUCCESS;
-
 }
 
 
