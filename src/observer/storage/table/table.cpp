@@ -74,7 +74,7 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   RC rc = RC::SUCCESS;
 
   // 使用 table_name.table记录一个表的元数据
-  // 判断表文件是否已经存在
+  // 判断表文件是否已经存在， 同时会创建文件
   int fd = ::open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
   if (fd < 0) {
     if (EEXIST == errno) {
@@ -86,6 +86,7 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   }
 
   close(fd);
+
 
   // 创建文件
   const vector<FieldMeta> *trx_fields = db->trx_kit().trx_fields();
@@ -101,7 +102,7 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
     return RC::IOERR_OPEN;
   }
 
-  // 记录元数据到文件中
+  // 记录元数据到文件中  JSON格式 serialize函数：转JSON格式
   table_meta_.serialize(fs);
   fs.close();
 
@@ -129,10 +130,12 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
 
 RC Table::drop(Table *table, const char* path){
   RC rc = RC::SUCCESS;
+  BufferPoolManager &bpm       = db_->buffer_pool_manager();
 
   // remove index
   for(Index *index : indexes_) {
-    index->drop_index();
+    string index_file = table_index_file(table->base_dir_.c_str(), table->name(), index->index_meta().name());
+    index->drop_index(bpm, index_file.c_str());
   }
 
   // destroy record_handler
@@ -142,7 +145,6 @@ RC Table::drop(Table *table, const char* path){
 
   // destroy buffer pool and remove data file
   string             data_file = table_data_file(table->base_dir_.c_str(), table->name());
-  BufferPoolManager &bpm       = db_->buffer_pool_manager();
   rc                           = bpm.drop_file(data_file.c_str());
   // TODO ： 判断RC的类型
   if (rc != RC::SUCCESS) {

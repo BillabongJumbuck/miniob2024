@@ -125,6 +125,10 @@ void Value::set_data(char *data, int length)
       value_.bool_value_ = *(int *)data != 0;
       length_            = length;
     } break;
+    case AttrType::DATES: {
+      value_.int_value_ = *(int *)data;
+      length_             = length;
+    }
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
     } break;
@@ -153,6 +157,13 @@ void Value::set_boolean(bool val)
   value_.bool_value_ = val;
   length_            = sizeof(val);
 }
+
+void Value::set_date(int y, int m, int d)
+{
+  value_.int_value_ = y * 10000 + m * 100 + d;
+  attr_type_ = AttrType::DATES;
+}
+
 
 void Value::set_string(const char *s, int len /*= 0*/)
 {

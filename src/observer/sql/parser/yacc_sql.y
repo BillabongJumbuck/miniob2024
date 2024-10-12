@@ -88,6 +88,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         TRX_ROLLBACK
         INT_T
         STRING_T
+        DATE_T
         FLOAT_T
         HELP
         EXIT
@@ -359,6 +360,7 @@ number:
 type:
     INT_T      { $$ = static_cast<int>(AttrType::INTS); }
     | STRING_T { $$ = static_cast<int>(AttrType::CHARS); }
+    | DATE_T   { $$ = static_cast<int>(AttrType::DATES); }
     | FLOAT_T  { $$ = static_cast<int>(AttrType::FLOATS); }
     ;
 insert_stmt:        /*insert   语句的语法解析树*/

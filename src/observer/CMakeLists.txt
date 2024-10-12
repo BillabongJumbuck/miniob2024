@@ -12,7 +12,9 @@ FOREACH (F ${ALL_SRC})
                 sql/executor/drop_table_executor.h
                 sql/executor/drop_table_executor.cpp
                 sql/stmt/drop_table_stmt.h
-                sql/stmt/drop_table_stmt.cpp)
+                sql/stmt/drop_table_stmt.cpp
+                common/type/date_type.h
+                common/type/date_type.cpp)
         MESSAGE("Use " ${F})
     ENDIF()
 

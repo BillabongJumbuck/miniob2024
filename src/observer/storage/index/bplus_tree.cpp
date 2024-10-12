@@ -975,10 +975,13 @@ RC BplusTreeHandler::close()
   return RC::SUCCESS;
 }
 
-RC BplusTreeHandler::drop(){
-  // 没有实现！
-  // TODO 实现DROP
-  return RC::SUCCESS;
+RC BplusTreeHandler::drop(BufferPoolManager &bpm, const char *file_name){
+  RC rc = RC::SUCCESS;
+  if (disk_buffer_pool_ != nullptr) {
+    rc = bpm.drop_file(file_name);
+  }
+  disk_buffer_pool_ = nullptr;
+  return rc;
 }
 
 
