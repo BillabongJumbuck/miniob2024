@@ -1,7 +1,7 @@
-./deps/3rd/libevent
-./deps/3rd/googletest
-./deps/3rd/jsoncpp
-./deps/3rd/benchmark
+deps/3rd/libevent
+deps/3rd/googletest
+deps/3rd/jsoncpp
+deps/3rd/benchmark
 .vscode
 !.vscode/tasks.json
 !.vscode/launch.json
