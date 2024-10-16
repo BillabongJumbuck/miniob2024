@@ -49,24 +49,11 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   // 先收集记录再Update
   // 记录的有效性由事务来保证，如果事务不保证Update的有效性，那说明此事务类型不支持并发控制，比如VacuousTrx
   for (Record &record : records_) {
-    Record new_record = record;
-
-    size_t       copy_len = field_meta_->len();
-    const size_t data_len = value_.length();
-    if (field_meta_->type() == AttrType::CHARS) {
-      if (copy_len > data_len) {
-        copy_len = data_len + 1;
-      }
+    rc = trx -> update_record(table_, record, value_, field_meta_);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to update record: %s", strrc(rc));
+      return rc;
     }
-    memcpy(new_record.data() + field_meta_->offset(), value_.data(), copy_len);
-
-    trx->delete_record(table_, record);
-    trx_->insert_record(table_, new_record);
-
-    // if (rc != RC::SUCCESS) {
-    //   LOG_WARN("failed to update record: %s", strrc(rc));
-    //   return rc;
-    // }
   }
 
   return RC::SUCCESS;

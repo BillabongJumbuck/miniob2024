@@ -186,6 +186,12 @@ RC MvccTrx::delete_record(Table *table, Record &record)
   return RC::SUCCESS;
 }
 
+RC MvccTrx::update_record(Table *table, Record &record, Value value, const FieldMeta *field_meta){
+  //TODO implement MvccTrx::update_record
+  return RC::INTERNAL;
+}
+
+
 RC MvccTrx::visit_record(Table *table, Record &record, ReadWriteMode mode)
 {
   Field begin_field;
