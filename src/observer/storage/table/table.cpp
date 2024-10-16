@@ -507,6 +507,36 @@ RC Table::delete_record(const Record &record)
   return rc;
 }
 
+RC Table::update_record(const Record &record, const Value& value, const FieldMeta *field_meta){
+  Record new_record = record;
+
+  size_t       copy_len = field_meta->len();
+  const size_t data_len = value.length();
+  if (field_meta->type() == AttrType::CHARS) {
+    if (copy_len > data_len) {
+      copy_len = data_len + 1;
+    }
+  }
+  memcpy(new_record.data() + field_meta->offset(), value.data(), copy_len);
+
+  RC rc = RC::SUCCESS;
+  rc = delete_record(record);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to delete old record when update! table=%s, field=%s, value=%s",
+      this->name(), field_meta->name(), value.data());
+    return rc;
+  }
+  rc = insert_record(new_record);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to insert new record when update! table=%s, field=%s, value=%s",
+      this->name(), field_meta->name(), value.data());
+    return rc;
+  }
+
+  return rc;
+}
+
+
 RC Table::insert_entry_of_indexes(const char *record, const RID &rid)
 {
   RC rc = RC::SUCCESS;
