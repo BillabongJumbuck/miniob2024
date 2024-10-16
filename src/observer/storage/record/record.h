@@ -226,21 +226,6 @@ public:
     return RC::SUCCESS;
   }
 
-  RC set_field_const_date(int field_offset, int field_len,const char *data)
-  {
-    if (!owner_) {
-      LOG_ERROR("cannot set field when record does not own the memory");
-      return RC::INTERNAL;
-    }
-    if (field_offset + field_len > len_) {
-      LOG_ERROR("invalid offset or length. offset=%d, length=%d, total length=%d", field_offset, field_len, len_);
-      return RC::INVALID_ARGUMENT;
-    }
-
-    memcpy(data_ + field_offset, data, field_len);
-    return RC::SUCCESS;
-  }
-
   char       *data() { return this->data_; }
   const char *data() const { return this->data_; }
   int         len() const { return this->len_; }
