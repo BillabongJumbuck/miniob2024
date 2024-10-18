@@ -142,6 +142,17 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
     case GREAT_THAN: {
       result = (cmp_result > 0);
     } break;
+    case LIKE: {
+      if(left.attr_type() != AttrType::CHARS){
+        LOG_ERROR("like only support CHARS type. attr_type=%s", left.attr_type());
+        return RC::INVALID_ARGUMENT;
+      }
+      
+      const char* pattern = right.data();
+      const char* str = left.data();
+      
+      result = match_pattern(pattern, str);
+    } break;
     default: {
       LOG_WARN("unsupported comparison. %d", comp_);
       rc = RC::INTERNAL;
@@ -149,6 +160,27 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   }
 
   return rc;
+}
+
+bool ComparisonExpr::match_pattern(const char* pattern, const char* str) const {
+    while (*str && *pattern != '%') {
+        if (*pattern != '_' && *pattern != *str) return false;
+        ++pattern;
+        ++str;
+    }
+
+    if (*pattern == '%') {
+        while (*(++pattern) == '%') ; // 跳过连续的 '%'
+        if (!*pattern) return true; // 如果 pattern 结束了，说明匹配成功
+
+        // 递归检查剩余部分
+        while (*str) {
+            if (match_pattern(pattern, str)) return true;
+            ++str;
+        }
+    }
+
+    return *pattern == '\0' && *str == '\0';
 }
 
 RC ComparisonExpr::try_get_value(Value &cell) const
@@ -221,6 +253,13 @@ RC ComparisonExpr::eval(Chunk &chunk, std::vector<uint8_t> &select)
     rc = compare_column<int>(left_column, right_column, select);
   } else if (left_column.attr_type() == AttrType::FLOATS) {
     rc = compare_column<float>(left_column, right_column, select);
+  } else if (left_column.attr_type() == AttrType::CHARS && comp_ == CompOp::LIKE) {
+    // like 比较
+    for (int i = 0; i < left_column.count(); i++) {
+      Value left_value  = left_column.get_value(i);
+      Value right_value = right_column.get_value(i);
+      select[i] &= (match_pattern(left_value.data(), right_value.data()) ? 1 : 0);
+    }
   } else {
     // TODO: support string compare
     LOG_WARN("unsupported data type %d", left_column.attr_type());
