@@ -145,6 +145,81 @@ bool DefaultConditionFilter::filter(const Record &rec) const
     case LESS_THAN: return cmp_result < 0;
     case GREAT_EQUAL: return cmp_result >= 0;
     case GREAT_THAN: return cmp_result > 0;
+    case LIKE: return [](const char* pattern, const char* str)->bool {
+      while (*str && *pattern != '%') {
+        if (*pattern != '_' && *pattern != *str) return false;
+        ++pattern;
+        ++str;
+      }
+
+      if (*pattern == '%') {
+        while (*(++pattern) == '%') ; // 跳过连续的 '%'
+        if (!*pattern) return true; // 如果 pattern 结束了，说明匹配成功
+
+        // 非递归检查剩余部分
+        const char* str_backup = str;
+        const char* pattern_backup = pattern;
+
+        while (*str) {
+          while (*str && *pattern != '%') {
+            if (*pattern != '_' && *pattern != *str) break;
+            ++pattern;
+            ++str;
+          }
+
+          if (*pattern == '%') {
+            while (*(++pattern) == '%') ; // 跳过连续的 '%'
+            if (!*pattern) return true; // 如果 pattern 结束了，说明匹配成功
+          }
+
+          if (*pattern == '\0' && *str == '\0') return true;
+
+          // 回溯
+          str = str_backup + 1;
+          pattern = pattern_backup;
+        }
+      }
+
+      return *pattern == '\0' && *str == '\0';
+    }(left_value.get_string().c_str(), right_value.get_string().c_str());
+
+    case NOT_LIKE: return [](const char* pattern, const char* str)->bool {
+      while (*str && *pattern != '%') {
+        if (*pattern != '_' && *pattern != *str) return false;
+        ++pattern;
+        ++str;
+      }
+
+      if (*pattern == '%') {
+        while (*(++pattern) == '%') ; // 跳过连续的 '%'
+        if (!*pattern) return true; // 如果 pattern 结束了，说明匹配成功
+
+        // 非递归检查剩余部分
+        const char* str_backup = str;
+        const char* pattern_backup = pattern;
+
+        while (*str) {
+          while (*str && *pattern != '%') {
+            if (*pattern != '_' && *pattern != *str) break;
+            ++pattern;
+            ++str;
+          }
+
+          if (*pattern == '%') {
+            while (*(++pattern) == '%') ; // 跳过连续的 '%'
+            if (!*pattern) return true; // 如果 pattern 结束了，说明匹配成功
+          }
+
+          if (*pattern == '\0' && *str == '\0') return true;
+
+          // 回溯
+          str = str_backup + 1;
+          pattern = pattern_backup;
+        }
+      }
+
+      return !(*pattern == '\0' && *str == '\0');
+    }(left_value.get_string().c_str(), right_value.get_string().c_str());
 
     default: break;
   }
