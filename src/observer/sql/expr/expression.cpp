@@ -153,6 +153,17 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
       
       result = match_pattern(pattern, str);
     } break;
+    case NOT_LIKE: {
+      if(left.attr_type() != AttrType::CHARS){
+        LOG_ERROR("like only support CHARS type. attr_type=%s", left.attr_type());
+        return RC::INVALID_ARGUMENT;
+      }
+
+      const char* pattern = right.data();
+      const char* str = left.data();
+
+      result = !(match_pattern(pattern, str));
+    } break;
     default: {
       LOG_WARN("unsupported comparison. %d", comp_);
       rc = RC::INTERNAL;
@@ -260,7 +271,15 @@ RC ComparisonExpr::eval(Chunk &chunk, std::vector<uint8_t> &select)
       Value right_value = right_column.get_value(i);
       select[i] &= (match_pattern(left_value.data(), right_value.data()) ? 1 : 0);
     }
-  } else {
+  } else if(left_column.attr_type() == AttrType::CHARS && comp_ == CompOp::NOT_LIKE) {
+    // like 比较
+    for (int i = 0; i < left_column.count(); i++) {
+      Value left_value  = left_column.get_value(i);
+      Value right_value = right_column.get_value(i);
+      select[i] &= (match_pattern(left_value.data(), right_value.data()) ? 0 : 1);
+    }
+  }
+  else {
     // TODO: support string compare
     LOG_WARN("unsupported data type %d", left_column.attr_type());
     return RC::INTERNAL;
