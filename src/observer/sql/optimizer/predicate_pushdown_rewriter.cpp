@@ -72,12 +72,13 @@ bool PredicatePushdownRewriter::is_empty_predicate(std::unique_ptr<Expression> &
     return true;
   }
 
-  if (expr->type() == ExprType::CONJUNCTION) {
-    ConjunctionExpr *conjunction_expr = static_cast<ConjunctionExpr *>(expr.get());
-    if (conjunction_expr->children().empty()) {
-      bool_ret = true;
-    }
-  }
+  // TODO： 重写 20241020 qjm
+  // if (expr->type() == ExprType::CONJUNCTION) {
+  //   ConjunctionExpr *conjunction_expr = static_cast<ConjunctionExpr *>(expr.get());
+  //   if (conjunction_expr->children().empty()) {
+  //     bool_ret = true;
+  //   }
+  // }
 
   return bool_ret;
 }
@@ -93,30 +94,31 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(
 {
   RC rc = RC::SUCCESS;
   if (expr->type() == ExprType::CONJUNCTION) {
-    ConjunctionExpr *conjunction_expr = static_cast<ConjunctionExpr *>(expr.get());
-    // 或 操作的比较，太复杂，现在不考虑
-    if (conjunction_expr->conjunction_type() == ConjunctionExpr::Type::OR) {
-      LOG_WARN("unsupported or operation");
-      rc = RC::UNIMPLEMENTED;
-      return rc;
-    }
-
-    std::vector<std::unique_ptr<Expression>> &child_exprs = conjunction_expr->children();
-    for (auto iter = child_exprs.begin(); iter != child_exprs.end();) {
-      // 对每个子表达式，判断是否可以下放到table get 算子
-      // 如果可以的话，就从当前孩子节点中删除他
-      rc = get_exprs_can_pushdown(*iter, pushdown_exprs);
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("failed to get pushdown expressions. rc=%s", strrc(rc));
-        return rc;
-      }
-
-      if (!*iter) {
-        child_exprs.erase(iter);
-      } else {
-        ++iter;
-      }
-    }
+    // TODO 重写
+    // ConjunctionExpr *conjunction_expr = static_cast<ConjunctionExpr *>(expr.get());
+    // // 或 操作的比较，太复杂，现在不考虑
+    // if (conjunction_expr->conjunction_type() == ConjunctionExpr::Type::OR) {
+    //   LOG_WARN("unsupported or operation");
+    //   rc = RC::UNIMPLEMENTED;
+    //   return rc;
+    // }
+    //
+    // std::vector<std::unique_ptr<Expression>> &child_exprs = conjunction_expr->children();
+    // for (auto iter = child_exprs.begin(); iter != child_exprs.end();) {
+    //   // 对每个子表达式，判断是否可以下放到table get 算子
+    //   // 如果可以的话，就从当前孩子节点中删除他
+    //   rc = get_exprs_can_pushdown(*iter, pushdown_exprs);
+    //   if (rc != RC::SUCCESS) {
+    //     LOG_WARN("failed to get pushdown expressions. rc=%s", strrc(rc));
+    //     return rc;
+    //   }
+    //
+    //   if (!*iter) {
+    //     child_exprs.erase(iter);
+    //   } else {
+    //     ++iter;
+    //   }
+    // }
   } else if (expr->type() == ExprType::COMPARISON) {
     // 如果是比较操作，并且比较的左边或右边是表某个列值，那么就下推下去
     auto   comparison_expr = static_cast<ComparisonExpr *>(expr.get());

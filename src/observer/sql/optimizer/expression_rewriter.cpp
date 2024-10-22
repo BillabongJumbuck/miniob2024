@@ -122,20 +122,25 @@ RC ExpressionRewriter::rewrite_expression(unique_ptr<Expression> &expr, bool &ch
     case ExprType::CONJUNCTION: {
       auto                                      conjunction_expr = static_cast<ConjunctionExpr *>(expr.get());
 
-      vector<unique_ptr<Expression>> &children         = conjunction_expr->children();
-      for (unique_ptr<Expression> &child_expr : children) {
-        bool sub_change_made = false;
+      unique_ptr<Expression> &left_expr       = conjunction_expr->left();
+      unique_ptr<Expression> &right_expr      = conjunction_expr->right();
 
-        rc                   = rewrite_expression(child_expr, sub_change_made);
-        if (rc != RC::SUCCESS) {
+      bool left_change_made = false;
 
-          LOG_WARN("failed to rewriter conjunction sub expression. rc=%s", strrc(rc));
-          return rc;
-        }
+      rc                    = rewrite_expression(left_expr, left_change_made);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
 
-        if (sub_change_made && !change_made) {
-          change_made = true;
-        }
+      bool right_change_made = false;
+
+      rc                     = rewrite_expression(right_expr, right_change_made);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+
+      if (left_change_made || right_change_made) {
+        change_made = true;
       }
     } break;
 

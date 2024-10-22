@@ -29,6 +29,13 @@ class ExplainStmt;
 class LogicalOperator;
 class UpdateStmt;
 
+class Expression;
+class ConjunctionExpr;
+class ComparisonExpr;
+class ArithmeticExpr;
+class Table;
+class Db;
+
 class LogicalPlanGenerator
 {
 public:
@@ -50,4 +57,7 @@ private:
   RC create_group_by_plan(SelectStmt *select_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
 
   int implicit_cast_cost(AttrType from, AttrType to);
+  RC traversal(ConjunctionExpr *expr, Table *default_table, Db *db);
+  RC comparison_process(ComparisonExpr *expr, Table *default_table, Db *db);
+  RC arithmetic_process(ArithmeticExpr *expr, Table *default_table, Db *db);
 };

@@ -74,16 +74,28 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     return RC::INVALID_ARGUMENT;
   }
 
-  // 创建条件查询语句
-  std::unordered_map<std::string, Table *> table_map;
-  table_map.insert(std::pair<std::string, Table *>(std::string(table_name), table));
-
-  FilterStmt *filter_stmt = nullptr;
-  RC          rc          = FilterStmt::create(
-      db, table, &table_map, update.conditions.data(), static_cast<int>(update.conditions.size()), filter_stmt);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
-    return rc;
+  // create filter statement in `where` statement
+  FilterStmt *filter_stmt;
+  if(update.conditions == nullptr) {
+    filter_stmt = nullptr;
+  }else {
+    filter_stmt = new FilterStmt();
+    if(update.conditions->type() == ExprType::COMPARISON) {
+      RC rc = filter_stmt->create(dynamic_cast<ComparisonExpr *>(update.conditions), table, db);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("cannot construct filter stmt");
+        return rc;
+      }
+    }else if ( update.conditions->type() == ExprType::CONJUNCTION){
+      RC rc = filter_stmt->create(dynamic_cast<ConjunctionExpr *>(update.conditions), table, db);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("cannot construct filter stmt");
+        return rc;
+      }
+    }else {
+      LOG_WARN("invalid condition type");
+      return RC::INTERNAL;
+    }
   }
 
   stmt = new UpdateStmt(table, field_meta, value, filter_stmt);

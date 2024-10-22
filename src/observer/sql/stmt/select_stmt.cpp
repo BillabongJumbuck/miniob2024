@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/select_stmt.h"
+#include "sql/expr/expression.h"
 #include "common/lang/string.h"
 #include "common/log/log.h"
 #include "sql/stmt/filter_stmt.h"
@@ -88,17 +89,30 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   }
 
   // create filter statement in `where` statement
-  FilterStmt *filter_stmt = nullptr;
-  RC          rc          = FilterStmt::create(db,
-      default_table,
-      &table_map,
-      select_sql.conditions.data(),
-      static_cast<int>(select_sql.conditions.size()),
-      filter_stmt);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("cannot construct filter stmt");
-    return rc;
+  FilterStmt *filter_stmt;
+  if(select_sql.conditions == nullptr) {
+    filter_stmt = nullptr;
+  }else {
+    filter_stmt = new FilterStmt();
+    if(select_sql.conditions->type() == ExprType::COMPARISON) {
+      RC rc = filter_stmt->create(dynamic_cast<ComparisonExpr *>(select_sql.conditions), default_table, db);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("cannot construct filter stmt");
+        return rc;
+      }
+    }else if ( select_sql.conditions->type() == ExprType::CONJUNCTION){
+      RC rc = filter_stmt->create(dynamic_cast<ConjunctionExpr *>(select_sql.conditions), default_table, db);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("cannot construct filter stmt");
+        return rc;
+      }
+    }else {
+      LOG_WARN("invalid condition type");
+      return RC::INTERNAL;
+    }
   }
+
+
 
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
