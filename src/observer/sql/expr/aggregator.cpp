@@ -103,6 +103,7 @@ RC AvgAggregator::accumulate(const Value &value)
 {
   if (value_.attr_type() == AttrType::UNDEFINED) {
     value_ = Value(value.get_float());
+    sum_ = value.get_float();
     count_ = 1;
     return RC::SUCCESS;
   }
@@ -112,9 +113,8 @@ RC AvgAggregator::accumulate(const Value &value)
 
   count_ ++;
   // 转float
-  Value temp = Value(value.get_float());
-  Value::add(temp, value_, value_);
-  Value::divide(value_, Value(count_), value_);
+  sum_ += value.get_float();
+  value_ = Value(sum_ / static_cast<float>(count_));
   return RC::SUCCESS;
 }
 

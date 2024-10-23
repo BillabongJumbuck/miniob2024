@@ -64,4 +64,5 @@ public:
   RC evaluate(Value &result) override;
 private:
   int count_ = 0;
+  float sum_ = 0;
 };
