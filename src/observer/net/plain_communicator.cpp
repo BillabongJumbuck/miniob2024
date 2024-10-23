@@ -274,8 +274,10 @@ RC PlainCommunicator::write_tuple_result(SqlResult *sql_result)
 {
   RC rc = RC::SUCCESS;
   Tuple *tuple = nullptr;
+  bool is_empty = true;
   while (RC::SUCCESS == (rc = sql_result->next_tuple(tuple))) {
     assert(tuple != nullptr);
+    is_empty = false;
 
     int cell_num = tuple->cell_num();
     for (int i = 0; i < cell_num; i++) {
@@ -315,6 +317,51 @@ RC PlainCommunicator::write_tuple_result(SqlResult *sql_result)
       LOG_WARN("failed to send data to client. err=%s", strerror(errno));
       sql_result->close();
       return rc;
+    }
+  }
+
+  LOG_INFO("is empty =  %s", is_empty ? "true" : "false");
+  if(is_empty) {
+    TupleSchema tuple_schamema = sql_result->tuple_schema();
+    vector<int> is_count (tuple_schamema.cell_num(), 0);
+    bool has_count = false;
+    for(int i = 0; i < tuple_schamema.cell_num(); i++) {
+      auto spec = tuple_schamema.cell_at(i);
+      LOG_INFO("fild_name = %s", spec.alias());
+      // 如果spec.alias以count开头或COUNT开头，则is_count[i] = 1;
+      if(strncmp(spec.alias(), "count", 5) == 0 || strncmp(spec.alias(), "COUNT", 5) == 0) {
+        has_count = true;
+        is_count[i] = 1;
+      }
+    }
+    if(has_count) {
+      for(int i = 0; i < tuple_schamema.cell_num(); i++) {
+        if (i != 0) {
+          const char *delim = " | ";
+
+          rc = writer_->writen(delim, strlen(delim));
+          if (OB_FAIL(rc)) {
+            LOG_WARN("failed to send data to client. err=%s", strerror(errno));
+            sql_result->close();
+            return rc;
+          }
+        }
+
+        string cell_str;
+        int32_t size = strlen(tuple_schamema.cell_at(i).alias());
+        if(is_count[i] == 1) {
+          cell_str = "0" + string(size - cell_str.size(), ' ');
+        }else {
+          cell_str = string(size, ' ');
+        }
+
+        rc = writer_->writen(cell_str.c_str(), size);
+        if (OB_FAIL(rc)) {
+          LOG_WARN("failed to send data to client. err=%s", strerror(errno));
+          sql_result->close();
+          return rc;
+        }
+      }
     }
   }
 

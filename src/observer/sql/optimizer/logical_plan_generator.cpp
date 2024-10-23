@@ -16,6 +16,8 @@ See the Mulan PSL v2 for more details. */
 
 #include <common/log/log.h>
 
+#include "sql/expr/expression.h"
+
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/delete_logical_operator.h"
 #include "sql/operator/explain_logical_operator.h"
@@ -157,70 +159,274 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
   RC                                  rc = RC::SUCCESS;
-  std::vector<unique_ptr<Expression>> cmp_exprs;
-  const std::vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
-  for (const FilterUnit *filter_unit : filter_units) {
-    const FilterObj &filter_obj_left  = filter_unit->left();
-    const FilterObj &filter_obj_right = filter_unit->right();
-
-    unique_ptr<Expression> left(filter_obj_left.is_attr
-                                    ? static_cast<Expression *>(new FieldExpr(filter_obj_left.field))
-                                    : static_cast<Expression *>(new ValueExpr(filter_obj_left.value)));
-
-    unique_ptr<Expression> right(filter_obj_right.is_attr
-                                     ? static_cast<Expression *>(new FieldExpr(filter_obj_right.field))
-                                     : static_cast<Expression *>(new ValueExpr(filter_obj_right.value)));
-
-    if (left->value_type() != right->value_type()) {
-      auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
-      auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
-      if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {
-        ExprType left_type = left->type();
-        auto cast_expr = make_unique<CastExpr>(std::move(left), right->value_type());
-        if (left_type == ExprType::VALUE) {
-          Value left_val;
-          if (OB_FAIL(rc = cast_expr->try_get_value(left_val)))
-          {
-            LOG_WARN("failed to get value from left child", strrc(rc));
-            return rc;
-          }
-          left = make_unique<ValueExpr>(left_val);
-        } else {
-          left = std::move(cast_expr);
-        }
-      } else if (right_to_left_cost < left_to_right_cost && right_to_left_cost != INT32_MAX) {
-        ExprType right_type = right->type();
-        auto cast_expr = make_unique<CastExpr>(std::move(right), left->value_type());
-        if (right_type == ExprType::VALUE) {
-          Value right_val;
-          if (OB_FAIL(rc = cast_expr->try_get_value(right_val)))
-          {
-            LOG_WARN("failed to get value from right child", strrc(rc));
-            return rc;
-          }
-          right = make_unique<ValueExpr>(right_val);
-        } else {
-          right = std::move(cast_expr);
-        }
-
-      } else {
-        rc = RC::UNSUPPORTED;
-        LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left->value_type()), attr_type_to_string(right->value_type()));
-        return rc;
-      }
-    }
-
-    ComparisonExpr *cmp_expr = new ComparisonExpr(filter_unit->comp(), std::move(left), std::move(right));
-    cmp_exprs.emplace_back(cmp_expr);
-  }
 
   unique_ptr<PredicateLogicalOperator> predicate_oper;
-  if (!cmp_exprs.empty()) {
-    unique_ptr<ConjunctionExpr> conjunction_expr(new ConjunctionExpr(ConjunctionExpr::Type::AND, cmp_exprs));
-    predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(conjunction_expr)));
+  if(filter_stmt != nullptr) {
+    ConjunctionExpr* conjunction_expr = filter_stmt->conjunction();
+    rc = traversal(conjunction_expr, filter_stmt->table(), filter_stmt->db());
+    if (OB_FAIL(rc)) {
+      LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
+      return rc;
+    }
+    predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::unique_ptr<ConjunctionExpr>(conjunction_expr )));
+  }else {
+    predicate_oper = nullptr;
   }
 
   logical_operator = std::move(predicate_oper);
+  return rc;
+}
+
+RC LogicalPlanGenerator::traversal(ConjunctionExpr *expr, Table *default_table, Db *db)
+{
+  RC rc = RC::SUCCESS;
+  // 获取左右表达式
+  Expression *left = expr->left().get();
+  Expression *right = expr->right().get();
+
+  if(left->type() == ExprType::CONJUNCTION) {
+    rc = traversal(dynamic_cast<ConjunctionExpr*>(left), default_table, db);
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to traversal left expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  }else if(left->type() == ExprType::COMPARISON ) {
+     rc = comparison_process(dynamic_cast<ComparisonExpr*>(left), default_table, db);
+     if(OB_FAIL(rc)) {
+      LOG_WARN("failed to traversal left expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  }else {
+    LOG_ERROR("unexpected expression type: %s", left->type());
+    rc = RC::INTERNAL;
+  }
+
+  if(right->type() == ExprType::CONJUNCTION) {
+    rc = traversal(dynamic_cast<ConjunctionExpr*>(right), default_table, db);
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to traversal right expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  }else if(right->type() == ExprType::COMPARISON) {
+    rc = comparison_process(dynamic_cast<ComparisonExpr*>(right), default_table, db);
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to traversal right expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  }else {
+    LOG_ERROR("unexpected expression type: %s", right->type());
+    rc = RC::INTERNAL;
+  }
+  return rc;
+}
+
+RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default_table, Db *db)
+{
+  RC rc = RC::SUCCESS;
+
+
+  // Expression *left_child = expr->left().get();
+  std::unique_ptr<Expression> left_child = std::move(expr->left());
+  // 如果是unbound_field，则需要替换为field_expr
+  if(left_child->type() == ExprType::UNBOUND_FIELD) {
+    UnboundFieldExpr* unbound_expr = dynamic_cast<UnboundFieldExpr*>(left_child.get());
+    Table *table;
+    if(unbound_expr->table_name() == nullptr || unbound_expr->table_name()[0] == '\0') {
+      table = default_table;
+    }else {
+      table = db->find_table(unbound_expr->table_name());
+    }
+    const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
+    // field不存在，返回错误
+    if(field_meta == nullptr) {
+      LOG_WARN("field not found: %s", unbound_expr->field_name());
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    left_child = std::make_unique<FieldExpr>(table, field_meta);
+  }else if (left_child-> type() == ExprType::ARITHMETIC) {
+    rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(left_child.get()), default_table, db);
+    // 判断rc
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  }
+
+  // Expression *right_child = expr->right().get();
+  std::unique_ptr<Expression> right_child = std::move(expr->right());
+  if(right_child->type() == ExprType::UNBOUND_FIELD) {
+    UnboundFieldExpr* unbound_expr = dynamic_cast<UnboundFieldExpr*>(right_child.get());
+    Table *table;
+    if(unbound_expr->table_name() == nullptr || unbound_expr->table_name()[0] == '\0') {
+      table = default_table;
+    }else {
+      table = db->find_table(unbound_expr->table_name());
+    }
+    const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
+    // field不存在，返回错误
+    if(field_meta == nullptr) {
+      LOG_WARN("field not found: %s", unbound_expr->field_name());
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    right_child = std::make_unique<FieldExpr>(table, field_meta);
+  }else if (right_child-> type() == ExprType::ARITHMETIC) {
+    rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(right_child.get()), default_table, db);
+    // 判断rc
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  }
+
+  // 尝试隐式转换
+  if (left_child->value_type() != right_child->value_type()) {
+    auto left_to_right_cost = implicit_cast_cost(left_child->value_type(), right_child->value_type());
+    auto right_to_left_cost = implicit_cast_cost(right_child->value_type(), left_child->value_type());
+    if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {
+      ExprType left_type = left_child->type();
+      std::unique_ptr<CastExpr> cast_expr =std::make_unique<CastExpr>(std::move(left_child), right_child->value_type());
+      if (left_type == ExprType::VALUE) {
+        Value left_val;
+        if (OB_FAIL(rc = cast_expr->try_get_value(left_val)))
+        {
+          LOG_WARN("failed to get value from left child", strrc(rc));
+          return rc;
+        }
+        left_child = std::make_unique<ValueExpr>(left_val);
+      } else {
+        left_child = std::move(cast_expr);
+      }
+    } else if (right_to_left_cost < left_to_right_cost && right_to_left_cost != INT32_MAX) {
+      ExprType right_type = right_child->type();
+      std::unique_ptr<CastExpr> cast_expr = std::make_unique<CastExpr>(std::move(right_child), left_child->value_type());
+      if (right_type == ExprType::VALUE) {
+        Value right_val;
+        if (OB_FAIL(rc = cast_expr->try_get_value(right_val)))
+        {
+          LOG_WARN("failed to get value from right child", strrc(rc));
+          return rc;
+        }
+        right_child = std::make_unique<ValueExpr>(right_val);
+      } else {
+        right_child = std::move(cast_expr);
+      }
+
+    } else {
+      rc = RC::UNSUPPORTED;
+      LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left_child->value_type()), attr_type_to_string(right_child->value_type()));
+      return rc;
+    }
+  }
+
+  expr->left() = std::move(left_child);
+  expr->right() = std::move(right_child);
+
+  return rc;
+}
+
+RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default_table, Db *db) {
+  RC rc = RC::SUCCESS;
+
+  // Expression *left_child = expr->left().get();
+  std::unique_ptr<Expression> left_child = std::move(expr->left());
+  // 如果是unbound_field，则需要替换为field_expr
+  if(left_child->type() == ExprType::UNBOUND_FIELD) {
+    UnboundFieldExpr* unbound_expr = dynamic_cast<UnboundFieldExpr*>(left_child.get());
+    Table *table;
+    if(unbound_expr->table_name() == nullptr || unbound_expr->table_name()[0] == '\0') {
+      table = default_table;
+    }else {
+      table = db->find_table(unbound_expr->table_name());
+    }
+    const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
+    // field不存在，返回错误
+    if(field_meta == nullptr) {
+      LOG_WARN("field not found: %s", unbound_expr->field_name());
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    left_child = std::make_unique<FieldExpr>(table, field_meta);
+  }else if (left_child-> type() == ExprType::ARITHMETIC) {
+    rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(left_child.get()), default_table, db);
+    // 判断rc
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  }
+
+  // 处理右子表达式
+  std::unique_ptr<Expression> right_child = nullptr;
+  if (expr->right() != nullptr) {
+    right_child = std::move(expr->right());
+    if(right_child->type() == ExprType::UNBOUND_FIELD) {
+      UnboundFieldExpr* unbound_expr = dynamic_cast<UnboundFieldExpr*>(right_child.get());
+      Table *table;
+      if(unbound_expr->table_name() == nullptr || unbound_expr->table_name()[0] == '\0') {
+        table = default_table;
+      }else {
+        table = db->find_table(unbound_expr->table_name());
+      }
+      const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
+      // field不存在，返回错误
+      if(field_meta == nullptr) {
+        LOG_WARN("field not found: %s", unbound_expr->field_name());
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+      right_child = std::make_unique<FieldExpr>(table, field_meta);
+    }else if (right_child-> type() == ExprType::ARITHMETIC) {
+      rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(right_child.get()), default_table, db);
+      // 判断rc
+      if(OB_FAIL(rc)) {
+        LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
+        return rc;
+      }
+    }
+  }
+
+  // 如果右子表达式不为空且类型不同，则进行隐式类型转换
+  if (right_child != nullptr && left_child->value_type() != right_child->value_type()) {
+    auto left_to_right_cost = implicit_cast_cost(left_child->value_type(), right_child->value_type());
+    auto right_to_left_cost = implicit_cast_cost(right_child->value_type(), left_child->value_type());
+    if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {
+      ExprType left_type = left_child->type();
+      std::unique_ptr<CastExpr> cast_expr =std::make_unique<CastExpr>(std::move(left_child), right_child->value_type());
+      if (left_type == ExprType::VALUE) {
+        Value left_val;
+        if (OB_FAIL(rc = cast_expr->try_get_value(left_val)))
+        {
+          LOG_WARN("failed to get value from left child", strrc(rc));
+          return rc;
+        }
+        left_child = std::make_unique<ValueExpr>(left_val);
+      } else {
+        left_child = std::move(cast_expr);
+      }
+    } else if (right_to_left_cost < left_to_right_cost && right_to_left_cost != INT32_MAX) {
+      ExprType right_type = right_child->type();
+      std::unique_ptr<CastExpr> cast_expr = std::make_unique<CastExpr>(std::move(right_child), left_child->value_type());
+      if (right_type == ExprType::VALUE) {
+        Value right_val;
+        if (OB_FAIL(rc = cast_expr->try_get_value(right_val)))
+        {
+          LOG_WARN("failed to get value from right child", strrc(rc));
+          return rc;
+        }
+        right_child = std::make_unique<ValueExpr>(right_val);
+      } else {
+        right_child = std::move(cast_expr);
+      }
+
+    } else {
+      rc = RC::UNSUPPORTED;
+      LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left_child->value_type()), attr_type_to_string(right_child->value_type()));
+      return rc;
+    }
+  }
+
+  // 更新左右子表达式
+  expr->left() = std::move(left_child);
+  expr->right() = std::move(right_child);
+
   return rc;
 }
 
@@ -292,6 +498,10 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
   vector<unique_ptr<Expression>> &query_expressions = select_stmt->query_expressions();
   function<RC(std::unique_ptr<Expression>&)> collector = [&](unique_ptr<Expression> &expr) -> RC {
     RC rc = RC::SUCCESS;
+    if(expr == nullptr) {
+      LOG_INFO("expr is nullptr when  collecto");
+      return  rc;
+    }
     if (expr->type() == ExprType::AGGREGATION) {
       expr->set_pos(aggregate_expressions.size() + group_by_expressions.size());
       aggregate_expressions.push_back(expr.get());
@@ -302,6 +512,10 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
 
   function<RC(std::unique_ptr<Expression>&)> bind_group_by_expr = [&](unique_ptr<Expression> &expr) -> RC {
     RC rc = RC::SUCCESS;
+    if(expr == nullptr) {
+      LOG_INFO("expr is nullptr when bind grouby expr");
+      return  rc;
+    }
     for (size_t i = 0; i < group_by_expressions.size(); i++) {
       auto &group_by = group_by_expressions[i];
       if (expr->type() == ExprType::AGGREGATION) {
@@ -319,6 +533,10 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
  bool found_unbound_column = false;
   function<RC(std::unique_ptr<Expression>&)> find_unbound_column = [&](unique_ptr<Expression> &expr) -> RC {
     RC rc = RC::SUCCESS;
+    if(expr == nullptr) {
+      LOG_INFO("expr is nullptr when find_unbound_column");
+      return  rc;
+    }
     if (expr->type() == ExprType::AGGREGATION) {
       // do nothing
     } else if (expr->pos() != -1) {

@@ -281,26 +281,43 @@ RC ExpressionBinder::bind_conjunction_expression(
 
   auto conjunction_expr = static_cast<ConjunctionExpr *>(expr.get());
 
-  vector<unique_ptr<Expression>>  child_bound_expressions;
-  vector<unique_ptr<Expression>> &children = conjunction_expr->children();
+  std::unique_ptr<Expression> &left_expr = conjunction_expr->left();
+  std::unique_ptr<Expression> &right_expr = conjunction_expr->right();
 
-  for (unique_ptr<Expression> &child_expr : children) {
-    child_bound_expressions.clear();
+  vector<unique_ptr<Expression>> child_bound_expressions;
 
-    RC rc = bind_expression(child_expr, child_bound_expressions);
-    if (rc != RC::SUCCESS) {
-      return rc;
-    }
+  // 绑定左子表达式
+  child_bound_expressions.clear();
+  RC rc = bind_expression(left_expr, child_bound_expressions);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
 
-    if (child_bound_expressions.size() != 1) {
-      LOG_WARN("invalid children number of conjunction expression: %d", child_bound_expressions.size());
-      return RC::INVALID_ARGUMENT;
-    }
+  if (child_bound_expressions.size() != 1) {
+    LOG_WARN("invalid children number of conjunction expression: %d", child_bound_expressions.size());
+    return RC::INVALID_ARGUMENT;
+  }
 
-    unique_ptr<Expression> &child = child_bound_expressions[0];
-    if (child.get() != child_expr.get()) {
-      child_expr.reset(child.release());
-    }
+  unique_ptr<Expression> &left_child = child_bound_expressions[0];
+  if (left_child.get() != left_expr.get()) {
+    left_expr.reset(left_child.release());
+  }
+
+  // 绑定右子表达式
+  child_bound_expressions.clear();
+  rc = bind_expression(right_expr, child_bound_expressions);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
+  if (child_bound_expressions.size() != 1) {
+    LOG_WARN("invalid children number of conjunction expression: %d", child_bound_expressions.size());
+    return RC::INVALID_ARGUMENT;
+  }
+
+  unique_ptr<Expression> &right_child = child_bound_expressions[0];
+  if (right_child.get() != right_expr.get()) {
+    right_expr.reset(right_child.release());
   }
 
   bound_expressions.emplace_back(std::move(expr));
@@ -337,19 +354,25 @@ RC ExpressionBinder::bind_arithmetic_expression(
   }
 
   child_bound_expressions.clear();
-  rc = bind_expression(right_expr, child_bound_expressions);
-  if (OB_FAIL(rc)) {
-    return rc;
-  }
 
-  if (child_bound_expressions.size() != 1) {
-    LOG_WARN("invalid right children number of comparison expression: %d", child_bound_expressions.size());
-    return RC::INVALID_ARGUMENT;
-  }
+  if(arithmetic_expr->arithmetic_type() != ArithmeticExpr::Type::NEGATIVE) {
+    rc = bind_expression(right_expr, child_bound_expressions);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
 
-  unique_ptr<Expression> &right = child_bound_expressions[0];
-  if (right.get() != right_expr.get()) {
-    right_expr.reset(right.release());
+    if (child_bound_expressions.size() != 1) {
+      LOG_WARN("invalid right children number of comparison expression: %d", child_bound_expressions.size());
+      return RC::INVALID_ARGUMENT;
+    }
+
+    unique_ptr<Expression> &right = child_bound_expressions[0];
+    if (right.get() != right_expr.get()) {
+      right_expr.reset(right.release());
+    }
+  }else {
+    // 右子表达式设nullptr
+    right_expr.reset(nullptr);
   }
 
   bound_expressions.emplace_back(std::move(expr));

@@ -43,17 +43,32 @@ RC DeleteStmt::create(Db *db, const DeleteSqlNode &delete_sql, Stmt *&stmt)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  std::unordered_map<std::string, Table *> table_map;
-  table_map.insert(std::pair<std::string, Table *>(std::string(table_name), table));
-
-  FilterStmt *filter_stmt = nullptr;
-  RC          rc          = FilterStmt::create(
-      db, table, &table_map, delete_sql.conditions.data(), static_cast<int>(delete_sql.conditions.size()), filter_stmt);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
-    return rc;
+  // create filter statement in `where` statement
+  FilterStmt *filter_stmt;
+  if(delete_sql.conditions == nullptr) {
+    filter_stmt = nullptr;
+  }else {
+    filter_stmt = new FilterStmt();
+    if(delete_sql.conditions->type() == ExprType::COMPARISON) {
+      RC rc = filter_stmt->create(dynamic_cast<ComparisonExpr *>(delete_sql.conditions), table, db);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("cannot construct filter stmt");
+        return rc;
+      }
+    }else if (delete_sql.conditions->type() == ExprType::CONJUNCTION){
+      RC rc = filter_stmt->create(dynamic_cast<ConjunctionExpr *>(delete_sql.conditions), table, db);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("cannot construct filter stmt");
+        return rc;
+      }
+    }else {
+      LOG_WARN("invalid condition type");
+      return RC::INTERNAL;
+    }
   }
 
+
   stmt = new DeleteStmt(table, filter_stmt);
-  return rc;
+
+  return RC::SUCCESS;
 }

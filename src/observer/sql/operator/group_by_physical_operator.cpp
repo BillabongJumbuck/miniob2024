@@ -38,8 +38,8 @@ void GroupByPhysicalOperator::create_aggregator_list(AggregatorList &aggregator_
   aggregator_list.clear();
   aggregator_list.reserve(aggregate_expressions_.size());
   ranges::for_each(aggregate_expressions_, [&aggregator_list](Expression *expr) {
-    auto *aggregate_expr = static_cast<AggregateExpr *>(expr);
-    aggregator_list.emplace_back(aggregate_expr->create_aggregator());
+    auto *aggregate_expr = dynamic_cast<AggregateExpr *>(expr);
+    aggregator_list.emplace_back(std::move(aggregate_expr->create_aggregator()));
   });
 }
 

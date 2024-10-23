@@ -16,6 +16,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
 
+#include <storage/db/db.h>
+
 using namespace std;
 
 RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
@@ -114,6 +116,10 @@ RC CastExpr::try_get_value(Value &result) const
 
 ComparisonExpr::ComparisonExpr(CompOp comp, unique_ptr<Expression> left, unique_ptr<Expression> right)
     : comp_(comp), left_(std::move(left)), right_(std::move(right))
+{}
+
+ComparisonExpr::ComparisonExpr(CompOp comp, Expression* left, Expression* right)
+    : comp_(comp), left_(left), right_(right)
 {}
 
 ComparisonExpr::~ComparisonExpr() {}
@@ -307,34 +313,58 @@ RC ComparisonExpr::compare_column(const Column &left, const Column &right, std::
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-ConjunctionExpr::ConjunctionExpr(Type type, vector<unique_ptr<Expression>> &children)
-    : conjunction_type_(type), children_(std::move(children))
-{}
+ConjunctionExpr::ConjunctionExpr(Type type, Expression *left, Expression *right):
+    conjunction_type_(type) , left_(left), right_(right){}
 
 RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
 {
   RC rc = RC::SUCCESS;
-  if (children_.empty()) {
-    value.set_boolean(true);
+
+  Value left_value;
+  rc = left_->get_value(tuple, left_value);
+  if (rc == RC::INVALID_ARGUMENT) {
+    LOG_DEBUG("divide by zero!");
+    left_value.set_boolean(false);
+  }else if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value by left child expression. rc=%s", strrc(rc));
     return rc;
   }
 
-  Value tmp_value;
-  for (const unique_ptr<Expression> &expr : children_) {
-    rc = expr->get_value(tuple, tmp_value);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to get value by child expression. rc=%s", strrc(rc));
-      return rc;
+  if(conjunction_type_ == Type::AND) {
+    if(left_value.get_boolean() == true) {
+      Value right_value;
+      rc = right_->get_value(tuple, right_value);
+      if (rc == RC::INVALID_ARGUMENT) {
+        LOG_DEBUG("divide by zero!");
+        right_value.set_boolean(false);
+      }else if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get value by right child expression. rc=%s", strrc(rc));
+        return rc;
+      }
+      value.set_boolean(right_value.get_boolean());
+    }else {
+      value.set_boolean(false);
     }
-    bool bool_value = tmp_value.get_boolean();
-    if ((conjunction_type_ == Type::AND && !bool_value) || (conjunction_type_ == Type::OR && bool_value)) {
-      value.set_boolean(bool_value);
-      return rc;
+  }else if(conjunction_type_ == Type::OR) {
+    if(left_value.get_boolean() == false) {
+      Value right_value;
+      rc = right_->get_value(tuple, right_value);
+      if (rc == RC::INVALID_ARGUMENT) {
+        LOG_DEBUG("divide by zero!");
+        right_value.set_boolean(false);
+      }else if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get value by right child expression. rc=%s", strrc(rc));
+        return rc;
+      }
+    value.set_boolean(right_value.get_boolean());
+    }else {
+      value.set_boolean(true);
     }
+  }else {
+    LOG_ERROR("unsupported conjunction type %d", conjunction_type_);
+    return  RC::INTERNAL;
   }
 
-  bool default_value = (conjunction_type_ == Type::AND);
-  value.set_boolean(default_value);
   return rc;
 }
 
@@ -394,6 +424,11 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
     } break;
 
     case Type::DIV: {
+      if ( (right_value.attr_type() == AttrType::INTS && right_value.get_int() == 0)
+        || (right_value.attr_type() == AttrType::FLOATS && right_value.get_float() == 0)) {
+        LOG_DEBUG("divide by zero");
+        return RC::INVALID_ARGUMENT;
+      }
       Value::divide(left_value, right_value, value);
     } break;
 
@@ -489,11 +524,16 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
     LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
     return rc;
   }
-  rc = right_->get_value(tuple, right_value);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
-    return rc;
+  if(right_ != nullptr) {
+    rc = right_->get_value(tuple, right_value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  }else {
+    right_value.set_value(Value(0));
   }
+
   return calc_value(left_value, right_value, value);
 }
 
@@ -609,12 +649,22 @@ unique_ptr<Aggregator> AggregateExpr::create_aggregator() const
   switch (aggregate_type_) {
     case Type::SUM: {
       aggregator = make_unique<SumAggregator>();
-      break;
-    }
+    }break;
+    case Type::COUNT: {
+      aggregator = make_unique<CountAggregator>();
+    }break;
+    case Type::MAX: {
+        aggregator = make_unique<MaxAggregator>();
+    }break;
+    case Type::MIN: {
+        aggregator = make_unique<MinAggregator>();
+    }break;
+    case Type::AVG: {
+      aggregator = make_unique<AvgAggregator>();
+    }break;
     default: {
       ASSERT(false, "unsupported aggregate type");
-      break;
-    }
+    }break;
   }
   return aggregator;
 }

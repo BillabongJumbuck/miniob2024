@@ -41,11 +41,10 @@ RC ExpressionIterator::iterate_child_expr(Expression &expr, function<RC(unique_p
 
     case ExprType::CONJUNCTION: {
       auto &conjunction_expr = static_cast<ConjunctionExpr &>(expr);
-      for (auto &child : conjunction_expr.children()) {
-        rc = callback(child);
-        if (OB_FAIL(rc)) {
-          break;
-        }
+
+      rc = callback(conjunction_expr.left());
+      if (OB_SUCC(rc)) {
+        rc = callback(conjunction_expr.right());
       }
     } break;
 
