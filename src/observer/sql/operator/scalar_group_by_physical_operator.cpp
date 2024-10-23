@@ -83,7 +83,8 @@ RC ScalarGroupByPhysicalOperator::open(Trx *trx)
   }
 
   // 得到最终聚合后的值
-  if (group_value_) {
+  LOG_INFO("group_value = %s", group_value_ == nullptr ? "nullptr" : "not nullptr");
+  if (group_value_ ) {
     rc = evaluate(*group_value_);
   }
 

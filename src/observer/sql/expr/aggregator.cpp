@@ -51,6 +51,10 @@ RC CountAggregator::accumulate(const Value &value)
 
 RC CountAggregator::evaluate(Value& result)
 {
+  if(value_.attr_type() == AttrType::UNDEFINED) {
+    value_ = Value(0);
+  }
+
   result = value_;
   return RC::SUCCESS;
 }
