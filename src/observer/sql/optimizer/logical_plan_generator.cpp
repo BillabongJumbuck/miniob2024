@@ -163,7 +163,11 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   unique_ptr<PredicateLogicalOperator> predicate_oper;
   if(filter_stmt != nullptr) {
     ConjunctionExpr* conjunction_expr = filter_stmt->conjunction();
-    traversal(conjunction_expr, filter_stmt->table(), filter_stmt->db());
+    rc = traversal(conjunction_expr, filter_stmt->table(), filter_stmt->db());
+    if (OB_FAIL(rc)) {
+      LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
+      return rc;
+    }
     predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::unique_ptr<ConjunctionExpr>(conjunction_expr )));
   }else {
     predicate_oper = nullptr;
@@ -182,26 +186,36 @@ RC LogicalPlanGenerator::traversal(ConjunctionExpr *expr, Table *default_table, 
 
   if(left->type() == ExprType::CONJUNCTION) {
     rc = traversal(dynamic_cast<ConjunctionExpr*>(left), default_table, db);
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to traversal left expression. rc=%s", strrc(rc));
+      return rc;
+    }
   }else if(left->type() == ExprType::COMPARISON ) {
      rc = comparison_process(dynamic_cast<ComparisonExpr*>(left), default_table, db);
-  }else if(left->type() == ExprType::ARITHMETIC) {
-    rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(left), default_table, db);
-  }
-  else {
+     if(OB_FAIL(rc)) {
+      LOG_WARN("failed to traversal left expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  }else {
     LOG_ERROR("unexpected expression type: %s", left->type());
     rc = RC::INTERNAL;
   }
 
   if(right->type() == ExprType::CONJUNCTION) {
-      traversal(dynamic_cast<ConjunctionExpr*>(right), default_table, db);
+    rc = traversal(dynamic_cast<ConjunctionExpr*>(right), default_table, db);
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to traversal right expression. rc=%s", strrc(rc));
+      return rc;
+    }
   }else if(right->type() == ExprType::COMPARISON) {
-      rc = comparison_process(dynamic_cast<ComparisonExpr*>(right), default_table, db);
-  }else if(right->type() == ExprType::ARITHMETIC) {
-    rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(right), default_table, db);
-  }
-  else {
-      LOG_ERROR("unexpected expression type: %s", right->type());
-      rc = RC::INTERNAL;
+    rc = comparison_process(dynamic_cast<ComparisonExpr*>(right), default_table, db);
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to traversal right expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  }else {
+    LOG_ERROR("unexpected expression type: %s", right->type());
+    rc = RC::INTERNAL;
   }
   return rc;
 }
@@ -223,9 +237,19 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
       table = db->find_table(unbound_expr->table_name());
     }
     const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
+    // field不存在，返回错误
+    if(field_meta == nullptr) {
+      LOG_WARN("field not found: %s", unbound_expr->field_name());
+      return RC::SCHEMA_FIELD_MISSING;
+    }
     left_child = std::make_unique<FieldExpr>(table, field_meta);
   }else if (left_child-> type() == ExprType::ARITHMETIC) {
     rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(left_child.get()), default_table, db);
+    // 判断rc
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
+      return rc;
+    }
   }
 
   // Expression *right_child = expr->right().get();
@@ -239,9 +263,19 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
       table = db->find_table(unbound_expr->table_name());
     }
     const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
+    // field不存在，返回错误
+    if(field_meta == nullptr) {
+      LOG_WARN("field not found: %s", unbound_expr->field_name());
+      return RC::SCHEMA_FIELD_MISSING;
+    }
     right_child = std::make_unique<FieldExpr>(table, field_meta);
   }else if (right_child-> type() == ExprType::ARITHMETIC) {
     rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(right_child.get()), default_table, db);
+    // 判断rc
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
+      return rc;
+    }
   }
 
   // 尝试隐式转换
@@ -305,9 +339,19 @@ RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default
       table = db->find_table(unbound_expr->table_name());
     }
     const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
+    // field不存在，返回错误
+    if(field_meta == nullptr) {
+      LOG_WARN("field not found: %s", unbound_expr->field_name());
+      return RC::SCHEMA_FIELD_MISSING;
+    }
     left_child = std::make_unique<FieldExpr>(table, field_meta);
   }else if (left_child-> type() == ExprType::ARITHMETIC) {
     rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(left_child.get()), default_table, db);
+    // 判断rc
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
+      return rc;
+    }
   }
 
   // 处理右子表达式
@@ -323,9 +367,19 @@ RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default
         table = db->find_table(unbound_expr->table_name());
       }
       const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
+      // field不存在，返回错误
+      if(field_meta == nullptr) {
+        LOG_WARN("field not found: %s", unbound_expr->field_name());
+        return RC::SCHEMA_FIELD_MISSING;
+      }
       right_child = std::make_unique<FieldExpr>(table, field_meta);
     }else if (right_child-> type() == ExprType::ARITHMETIC) {
       rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(right_child.get()), default_table, db);
+      // 判断rc
+      if(OB_FAIL(rc)) {
+        LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
+        return rc;
+      }
     }
   }
 
