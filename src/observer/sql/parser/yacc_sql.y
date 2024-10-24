@@ -379,6 +379,10 @@ null_option:
     {
       $$ = true;
     }
+    | NULL_TYPE
+    {
+      $$ = true;
+    }
     | NOT NULL_TYPE
     {
       $$ = false;
