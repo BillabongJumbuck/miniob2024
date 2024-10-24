@@ -115,6 +115,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NE
         LIKE_OP
         NOT
+        NULL_TYPE
+        NULLABLE
+        IS
         JOIN
         INNER
 
@@ -135,6 +138,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   char *                                     string;
   int                                        number;
   float                                      floats;
+  bool                                       boolean;
 }
 
 %token <number> NUMBER
@@ -148,6 +152,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <expression>          condition
 %type <value>               value
 %type <number>              number
+%type <boolean>             null_option
+%type <boolean>             is_null_comp
 %type <string>              relation
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
@@ -344,21 +350,38 @@ attr_def_list:
     ;
     
 attr_def:
-    ID type LBRACE number RBRACE 
+    ID type LBRACE number RBRACE null_option
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = $4;
+      $$->nullable = $6;
       free($1);
     }
-    | ID type
+    | ID type null_option
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;
+      $$->nullable = $3;
       free($1);
+    }
+    ;
+
+null_option:
+    /* empty */
+    {
+      $$ = false;
+    }
+    | NULLABLE
+    {
+      $$ = true;
+    }
+    | NOT NULL_TYPE
+    {
+      $$ = false;
     }
     ;
 number:
@@ -416,6 +439,10 @@ value:
       $$ = new Value(tmp);
       free(tmp);
       free($1);
+    }
+    | NULL_TYPE {
+      $$ = new Value();
+      $$->set_null();
     }
     ;
 storage_format:
@@ -601,6 +628,11 @@ condition:
     expression comp_op expression {
       $$ = new ComparisonExpr($2, $1, $3);
     }
+    | expression is_null_comp
+    {
+      ValueExpr *value_expr = new ValueExpr(Value(1));
+      $$ = new ComparisonExpr($2 ? IS_NULL : IS_NOT_NULL, $1, value_expr);
+    }
     | condition AND condition {
       $$ = new ConjunctionExpr(ConjunctionExpr::Type::AND, $1, $3);
     }
@@ -618,6 +650,17 @@ comp_op:
     | NE { $$ = NOT_EQUAL; }
     | LIKE_OP { $$ = LIKE; }
     | NOT LIKE_OP { $$ = NOT_LIKE; }
+    ;
+
+is_null_comp:
+    IS NULL_TYPE
+    {
+      $$ = true;
+    }
+    | IS NOT NULL_TYPE
+    {
+      $$ = false;
+    }
     ;
 
 // your code here
