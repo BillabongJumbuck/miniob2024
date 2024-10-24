@@ -524,12 +524,19 @@ RC Table::update_record(const Record &record, const Value& value, const FieldMet
 
   size_t       copy_len = field_meta->len();
   const size_t data_len = value.length();
+
+  const char *src = value.data();
+  if(value.is_null()) {
+    src = Value::to_null_storage();
+    copy_len = strlen(src);
+  }
+
   if (field_meta->type() == AttrType::CHARS) {
     if (copy_len > data_len) {
       copy_len = data_len + 1;
     }
   }
-  memcpy(new_record.data() + field_meta->offset(), value.data(), copy_len);
+  memcpy(new_record.data() + field_meta->offset(), src, copy_len);
 
   RC rc = RC::SUCCESS;
   rc = delete_record(record);

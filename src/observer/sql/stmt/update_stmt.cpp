@@ -69,7 +69,13 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
 
   // 检查类型是否一致
   Value value = update.value;
-  if(value.attr_type() != field_meta->type()) {
+  if(!value.is_null() && value.attr_type() != field_meta->type()) {
+    LOG_WARN("invalid argument. db=%p, attr_name=%p", db, attr_name);
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // 检查是否将null插入非null属性
+  if(value.is_null() && !field_meta->is_nullable()) {
     LOG_WARN("invalid argument. db=%p, attr_name=%p", db, attr_name);
     return RC::INVALID_ARGUMENT;
   }
