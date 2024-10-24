@@ -303,8 +303,14 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
-    const Value &    value = values[i];
-    if (field->type() != value.attr_type()) {
+    const Value     &value = values[i];
+    if (value.is_null()) {
+      if(!field->is_nullable()) {
+        LOG_WARN("null value is not allowed for non-nullable field. table name:%s,field name:%s", table_meta_.name(), field->name());
+        return RC::INTERNAL;
+      }
+      rc = set_value_to_record(record_data, value, field);
+    }else if (field->type() != value.attr_type()) {
       Value real_value;
       rc = Value::cast_to(value, field->type(), real_value);
       if (OB_FAIL(rc)) {
@@ -313,7 +319,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
         break;
       }
       rc = set_value_to_record(record_data, real_value, field);
-    } else {
+    }else {
       rc = set_value_to_record(record_data, value, field);
     }
   }
@@ -331,12 +337,18 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
 {
   size_t       copy_len = field->len();
   const size_t data_len = value.length();
+  const char *src = value.data();
+  if(value.is_null()) {
+    LOG_INFO("set null value to record. table name:%s,field name:%s", table_meta_.name(), field->name());
+    src = Value::to_null_storage(copy_len);
+    copy_len = strlen(src) + 1;
+  }
   if (field->type() == AttrType::CHARS) {
     if (copy_len > data_len) {
       copy_len = data_len + 1;
     }
   }
-  memcpy(record_data + field->offset(), value.data(), copy_len);
+  memcpy(record_data + field->offset(), src, copy_len);
   return RC::SUCCESS;
 }
 

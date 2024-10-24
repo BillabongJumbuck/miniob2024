@@ -36,6 +36,7 @@ public:
   friend class CharType;
   friend class DateType;
   friend class VectorType;
+  friend class NullType;
 
   Value() = default;
 
@@ -87,6 +88,8 @@ public:
   }
 
   void set_type(AttrType type) { this->attr_type_ = type; }
+  void set_null() { attr_type_ = AttrType::NULLS;}
+  bool is_null() const { return attr_type_ == AttrType::NULLS; }
   void set_data(char *data, int length);
   void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
   void set_value(const Value &value);
@@ -94,6 +97,7 @@ public:
   void set_date(int y, int m, int d);
 
   string to_string() const;
+  static const char* to_null_storage(size_t );
 
   int compare(const Value &other) const;
 

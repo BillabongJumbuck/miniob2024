@@ -127,26 +127,49 @@ ComparisonExpr::~ComparisonExpr() {}
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
   RC  rc         = RC::SUCCESS;
-  int cmp_result = left.compare(right);
   result         = false;
   switch (comp_) {
     case EQUAL_TO: {
-      result = (0 == cmp_result);
+      if(left.is_null() || right.is_null()) {
+        result = false;
+      }else {
+        result = (0 == left.compare(right));
+      }
     } break;
     case LESS_EQUAL: {
-      result = (cmp_result <= 0);
+      if(left.is_null() || right.is_null()) {
+        result = false;
+      }else {
+        result = (left.compare(right) <= 0);
+      }
     } break;
     case NOT_EQUAL: {
-      result = (cmp_result != 0);
+      if(left.is_null() || right.is_null()) {
+        result = false;
+      }else {
+        result = (left.compare(right) != 0);
+      }
     } break;
     case LESS_THAN: {
-      result = (cmp_result < 0);
+      if (left.is_null() || right.is_null()){
+        result = false;
+      }else {
+        result = (left.compare(right) < 0);
+      }
     } break;
     case GREAT_EQUAL: {
-      result = (cmp_result >= 0);
+      if(left.is_null() || right.is_null()) {
+        result = false;
+      }else {
+        result = (left.compare(right) >= 0);
+      }
     } break;
     case GREAT_THAN: {
-      result = (cmp_result > 0);
+      if(left.is_null() || right.is_null()) {
+        result = false;
+      }else {
+        result = (left.compare(right) > 0);
+      }
     } break;
     case LIKE: {
       if(left.attr_type() != AttrType::CHARS){
@@ -169,6 +192,12 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
       const char* str = left.data();
 
       result = !(match_pattern(pattern, str));
+    } break;
+    case IS_NULL: {
+      result = left.is_null();
+    } break;
+    case IS_NOT_NULL: {
+      result = !left.is_null();
     } break;
     default: {
       LOG_WARN("unsupported comparison. %d", comp_);
@@ -278,11 +307,21 @@ RC ComparisonExpr::eval(Chunk &chunk, std::vector<uint8_t> &select)
       select[i] &= (match_pattern(left_value.data(), right_value.data()) ? 1 : 0);
     }
   } else if(left_column.attr_type() == AttrType::CHARS && comp_ == CompOp::NOT_LIKE) {
-    // like 比较
+    // not like 比较
     for (int i = 0; i < left_column.count(); i++) {
       Value left_value  = left_column.get_value(i);
       Value right_value = right_column.get_value(i);
       select[i] &= (match_pattern(left_value.data(), right_value.data()) ? 0 : 1);
+    }
+  } else if(comp_ ==CompOp::IS_NULL) {
+    for (int i = 0; i < left_column.count(); i++) {
+      Value left_value  = left_column.get_value(i);
+      select[i] &= (left_value.is_null() ? 0 : 1);
+    }
+  }else if(comp_ ==CompOp::IS_NOT_NULL) {
+      for (int i = 0; i < left_column.count(); i++) {
+      Value left_value  = left_column.get_value(i);
+      select[i] &= (!left_value.is_null() ? 1 : 0);
     }
   }
   else {

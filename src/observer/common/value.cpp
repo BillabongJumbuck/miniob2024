@@ -109,6 +109,14 @@ void Value::reset()
 
 void Value::set_data(char *data, int length)
 {
+  // 比较data与Value::null_storage
+  if(strcmp(data, to_null_storage(length)) == 0) {
+    // set_string会把类型改为CHARS!!!!
+    set_string("NULL", 4);
+    // 赋值后转NULL
+    set_null();
+    return;
+  }
   switch (attr_type_) {
     case AttrType::CHARS: {
       set_string(data, length);
@@ -130,7 +138,7 @@ void Value::set_data(char *data, int length)
       length_             = length;
     }
     default: {
-      LOG_WARN("unknown data type: %d", attr_type_);
+      LOG_WARN("unknown data type: %s", attr_type_to_string(attr_type_));
     } break;
   }
 }
@@ -231,6 +239,10 @@ const char *Value::data() const
 
 string Value::to_string() const
 {
+  if(this-> is_null()) {
+    return  "NULL";
+  }
+
   string res;
   RC     rc = DataType::type_instance(this->attr_type_)->to_string(*this, res);
   if (OB_FAIL(rc)) {
@@ -239,6 +251,13 @@ string Value::to_string() const
   }
   return res;
 }
+
+const char* Value::to_null_storage(size_t len)
+{
+  constexpr char escape_char = 26;
+  return  (string(len-1, escape_char) + '\0').c_str();
+}
+
 
 int Value::compare(const Value &other) const { return DataType::type_instance(this->attr_type_)->compare(*this, other); }
 
