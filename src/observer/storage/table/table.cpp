@@ -341,7 +341,7 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
   if(value.is_null()) {
     LOG_INFO("set null value to record. table name:%s,field name:%s", table_meta_.name(), field->name());
     src = Value::to_null_storage();
-    copy_len = strlen(src);
+    copy_len = strlen(src) + 1;
   }
   if (field->type() == AttrType::CHARS) {
     if (copy_len > data_len) {
@@ -528,10 +528,8 @@ RC Table::update_record(const Record &record, const Value& value, const FieldMet
   const char *src = value.data();
   if(value.is_null()) {
     src = Value::to_null_storage();
-    copy_len = strlen(src);
-  }
-
-  if (field_meta->type() == AttrType::CHARS) {
+    copy_len = strlen(src) + 1;
+  }else if (field_meta->type() == AttrType::CHARS) {
     if (copy_len > data_len) {
       copy_len = data_len + 1;
     }
