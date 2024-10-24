@@ -399,7 +399,7 @@ type:
     | VECTOR_T { $$ = static_cast<int>(AttrType::VECTORS); }
     ;
 insert_stmt:        /*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE value value_list RBRACE 
+    INSERT INTO ID VALUES LBRACE value value_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_INSERT);
       $$->insertion.relation_name = $3;
@@ -434,9 +434,17 @@ value:
       $$ = new Value((int)$1);
       @$ = @1;
     }
-    |FLOAT {
+    | '-' NUMBER %prec UMINUS {
+      $$ = new Value(-(int)$2);
+      @$ = @2;
+    }
+    | FLOAT {
       $$ = new Value((float)$1);
       @$ = @1;
+    }
+    | '-' FLOAT %prec UMINUS {
+      $$ = new Value(-(float)$2);
+      @$ = @2;
     }
     |SSS {
       char *tmp = common::substr($1,1,strlen($1)-2);
