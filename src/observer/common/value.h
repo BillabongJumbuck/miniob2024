@@ -97,7 +97,7 @@ public:
   void set_date(int y, int m, int d);
 
   string to_string() const;
-  static const char* to_null_storage(size_t );
+  static const char* to_null_storage();
 
   int compare(const Value &other) const;
 
@@ -136,4 +136,6 @@ private:
 
   /// 是否申请并占有内存, 目前对于 CHARS 类型 own_data_ 为true, 其余类型 own_data_ 为false
   bool own_data_ = false;
+
+  static const char null_for_storage[];
 };

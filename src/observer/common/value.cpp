@@ -54,6 +54,8 @@ Value::Value(Value &&other)
   other.length_    = 0;
 }
 
+const char Value::null_for_storage[] = "\032\032\032\0";
+
 Value &Value::operator=(const Value &other)
 {
   if (this == &other) {
@@ -110,7 +112,8 @@ void Value::reset()
 void Value::set_data(char *data, int length)
 {
   // 比较data与Value::null_storage
-  if(strcmp(data, to_null_storage(length)) == 0) {
+  const char * null_string = to_null_storage();
+  if(strcmp(data, null_string) == 0) {
     // set_string会把类型改为CHARS!!!!
     set_string("NULL", 4);
     // 赋值后转NULL
@@ -252,10 +255,9 @@ string Value::to_string() const
   return res;
 }
 
-const char* Value::to_null_storage(size_t len)
+const char* Value::to_null_storage()
 {
-  constexpr char escape_char = 26;
-  return  (string(len-1, escape_char) + '\0').c_str();
+  return null_for_storage;
 }
 
 
