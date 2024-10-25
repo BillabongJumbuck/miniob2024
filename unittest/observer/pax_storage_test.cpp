@@ -259,10 +259,10 @@ TEST_P(PaxPageHandlerTestWithParam, DISABLED_PaxPageHandler)
 
   Chunk     chunk1;
   FieldMeta fm1, fm2, fm3, fm4;
-  fm1.init("col1", AttrType::INTS, 0, 4, true, 0);
-  fm2.init("col2", AttrType::FLOATS, 4, 4, true, 1);
-  fm3.init("col3", AttrType::CHARS, 8, 4, true, 2);
-  fm4.init("col4", AttrType::CHARS, 12, 7, true, 3);
+  fm1.init("col1", AttrType::INTS, 0, 4, true, 0,false);
+  fm2.init("col2", AttrType::FLOATS, 4, 4, true, 1, false);
+  fm3.init("col3", AttrType::CHARS, 8, 4, true, 2, false);
+  fm4.init("col4", AttrType::CHARS, 12, 7, true, 3, false);
   auto col_1 = std::make_unique<Column>(fm1, 2048);
   chunk1.add_column(std::move(col_1), 0);
   auto col_2 = std::make_unique<Column>(fm2, 2048);
@@ -285,7 +285,7 @@ TEST_P(PaxPageHandlerTestWithParam, DISABLED_PaxPageHandler)
 
   Chunk     chunk2;
   FieldMeta fm2_1;
-  fm2_1.init("col2", AttrType::FLOATS, 4, 4, true, 1);
+  fm2_1.init("col2", AttrType::FLOATS, 4, 4, true, 1, false);
   auto col_2_1 = std::make_unique<Column>(fm2_1, 2048);
   chunk2.add_column(std::move(col_2_1), 1);
   rc = record_page_handle->get_chunk(chunk2);
