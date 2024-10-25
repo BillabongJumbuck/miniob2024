@@ -92,7 +92,7 @@ TEST_P(PaxRecordFileScannerWithParam, DISABLED_test_file_iterator)
   ASSERT_EQ(rc, RC::SUCCESS);
   Chunk     chunk;
   FieldMeta fm;
-  fm.init("col1", AttrType::INTS, 0, 4, true, 0);
+  fm.init("col1", AttrType::INTS, 0, 4, true, 0, false);
   auto col1 = std::make_unique<Column>(fm, 2048);
   chunk.add_column(std::move(col1), 0);
   count = 0;
