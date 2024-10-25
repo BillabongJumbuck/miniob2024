@@ -137,13 +137,14 @@ union YYSTYPE
   std::vector<std::unique_ptr<Expression>> * expression_list;
   std::vector<Value> *                       value_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
-  std::vector<std::string> *                 relation_list;
+  std::vector<InnerJoinSqlNode> *            join_list;
+  InnerJoinSqlNode *                         join;
   char *                                     string;
   int                                        number;
   float                                      floats;
   bool                                       boolean;
 
-#line 147 "yacc_sql.hpp"
+#line 148 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

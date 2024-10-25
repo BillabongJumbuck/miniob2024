@@ -134,7 +134,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<std::unique_ptr<Expression>> * expression_list;
   std::vector<Value> *                       value_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
-  std::vector<std::string> *                 relation_list;
+  std::vector<InnerJoinSqlNode> *            join_list;
+  InnerJoinSqlNode *                         join;
   char *                                     string;
   int                                        number;
   float                                      floats;
@@ -162,7 +163,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <value_list>          value_list
 %type <condition>           where
 %type <string>              storage_format
-%type <relation_list>       rel_list
+%type <join_list>           from_list
+%type <join>                join_list
 %type <expression>          expression
 %type <expression>          aggr_func_expr
 %type <expression_list>     expression_list
@@ -494,7 +496,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list where group_by
+    SELECT expression_list FROM from_list where group_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -609,21 +611,32 @@ relation:
       $$ = $1;
     }
     ;
-rel_list:
-    relation {
-      $$ = new std::vector<std::string>();
-      $$->push_back($1);
-      free($1);
+
+join_list:
+    relation{
+      $$ = new InnerJoinSqlNode;
+      $$->tables.push_back($1);
     }
-    | relation COMMA rel_list {
+    | join_list INNER JOIN relation ON condition
+    {
+      $$ = $1;
+      $$->tables.push_back($4);
+      $$->conditions.push_back($6);
+    }
+    ;
+from_list:
+    join_list {
+      $$ = new std::vector<InnerJoinSqlNode>();
+      $$->push_back(*$1);
+    }
+    | join_list COMMA from_list {
       if ($3 != nullptr) {
         $$ = $3;
       } else {
-        $$ = new std::vector<std::string>;
+        $$ = new std::vector<InnerJoinSqlNode>;
       }
 
-      $$->insert($$->begin(), $1);
-      free($1);
+      $$->insert($$->begin(), *$1);
     }
     ;
 
