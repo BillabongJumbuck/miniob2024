@@ -16,6 +16,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
 
+#include <gtest/internal/gtest-internal.h>
+
 using namespace std;
 
 RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
@@ -121,6 +123,7 @@ ComparisonExpr::~ComparisonExpr() {}
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
   RC  rc         = RC::SUCCESS;
+  printf("in expression compare_value\n");
   int cmp_result = left.compare(right);
   result         = false;
   switch (comp_) {
@@ -201,7 +204,6 @@ RC ComparisonExpr::try_get_value(Value &cell) const
     ValueExpr *  right_value_expr = static_cast<ValueExpr *>(right_.get());
     const Value &left_cell        = left_value_expr->get_value();
     const Value &right_cell       = right_value_expr->get_value();
-
     bool value = false;
     RC   rc    = compare_value(left_cell, right_cell, value);
     if (rc != RC::SUCCESS) {
@@ -219,7 +221,7 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 {
   Value left_value;
   Value right_value;
-
+  printf("running get_values in expression\n");
   RC rc = left_->get_value(tuple, left_value);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
@@ -232,7 +234,6 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
   }
 
   bool bool_value = false;
-
   rc = compare_value(left_value, right_value, bool_value);
   if (rc == RC::SUCCESS) {
     value.set_boolean(bool_value);
@@ -370,6 +371,10 @@ AttrType ArithmeticExpr::value_type() const
     return AttrType::INTS;
   }
 
+  if (left_->value_type() == AttrType::VECTORS || right_->value_type() == AttrType::VECTORS) {
+    return AttrType::VECTORS;
+  }
+
   return AttrType::FLOATS;
 }
 
@@ -400,6 +405,21 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
     case Type::NEGATIVE: {
       Value::negative(left_value, value);
     } break;
+
+    case Type::LD: {
+      value.set_type(AttrType::FLOATS);
+      Value::l2_distance(left_value, right_value, value);
+    }break;
+
+    case Type::CD: {
+      value.set_type(AttrType::FLOATS);
+      Value::cosine_distance(left_value, right_value, value);
+    }break;
+
+    case Type::IP: {
+      value.set_type(AttrType::FLOATS);
+      Value::inner_product(left_value, right_value, value);
+    }break;
 
     default: {
       rc = RC::INTERNAL;

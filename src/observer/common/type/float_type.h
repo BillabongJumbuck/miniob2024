@@ -33,4 +33,9 @@ public:
   RC set_value_from_str(Value &val, const string &data) const override;
 
   RC to_string(const Value &val, string &result) const override;
+
+
+  RC l2_distance(const Value &left, const Value &right, Value &result) const override;
+  RC cosine_distance(const Value &left, const Value &right, Value &result) const override;
+  RC inner_product(const Value &left, const Value &right, Value &result) const override;
 };

@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/time/datetime.h"
 
 #include "date_type.h"
+#include "vector_type.h"
 #include "common/value.h"
 
 int CharType::compare(const Value &left, const Value &right) const
@@ -46,6 +47,40 @@ RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
       }
       result.set_date(y, m, d);
     }break;
+
+    case AttrType::VECTORS: {
+      result.attr_type_ = AttrType::VECTORS;
+      std::string vector_str(val.value_.pointer_value_);
+      std::vector<float> vector_values;
+      // 去掉开头和结尾的方括号
+      if (vector_str.front() == '[') {
+          vector_str.erase(0, 1);
+      }
+      if (vector_str.back() == ']') {
+          vector_str.pop_back();
+      }
+
+      // 分割字符串并解析浮点数
+      std::stringstream ss(vector_str);
+      std::string token;
+      while (std::getline(ss, token, ',')) {
+          try {
+              float value = std::stof(token); // 转换为浮点数
+              vector_values.push_back(value); // 存入向量
+          } catch (const std::exception &ex) {
+              LOG_WARN("invalid float format: %s", token.c_str());
+              return RC::INVALID_ARGUMENT;
+          }
+      }
+
+      // 检查向量维度是否超过最大限制
+      // if (vector_values.size() > 16000) { // 假设最大支持 16000 维
+      //     LOG_WARN("vector exceeds maximum dimension: %lu", vector_values.size());
+      //     return RC::INVALID_ARGUMENT;
+      // }
+      result.set_vector(vector_values.data(), vector_values.size());
+    } break;
+
     default: return RC::UNIMPLEMENTED;
   }
   return RC::SUCCESS;

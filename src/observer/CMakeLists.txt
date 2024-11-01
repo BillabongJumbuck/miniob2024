@@ -15,6 +15,7 @@ FOREACH (F ${ALL_SRC})
                 sql/stmt/drop_table_stmt.cpp
                 common/type/date_type.h
                 common/type/date_type.cpp
+                common/type/vector_type.cpp
                 sql/operator/update_logical_operator.cpp
                 sql/operator/update_logical_operator.h
                 sql/operator/update_physical_oprator.cpp

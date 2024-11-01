@@ -68,7 +68,12 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
     for (size_t i = 0; i < trx_fields->size(); i++) {
       const FieldMeta &field_meta = (*trx_fields)[i];
       fields_[i] = FieldMeta(field_meta.name(), field_meta.type(), field_offset, field_meta.len(), false /*visible*/, field_meta.field_id());
-      field_offset += field_meta.len();
+      // if (field_meta.type() == AttrType::VECTORS) {
+      //   field_offset += field_meta.len()*4;
+      // }else {
+        field_offset += field_meta.len();
+      printf("up %d\n", field_offset);
+      //}
     }
 
     trx_field_num = static_cast<int>(trx_fields->size());
@@ -79,14 +84,23 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
   for (size_t i = 0; i < attributes.size(); i++) {
     const AttrInfoSqlNode &attr_info = attributes[i];
     // `i` is the col_id of fields[i]
+    size_t real_len = attr_info.length;
+    if (attr_info.type == AttrType::VECTORS) {
+      real_len = attr_info.length*4;
+    }
     rc = fields_[i + trx_field_num].init(
-      attr_info.name.c_str(), attr_info.type, field_offset, attr_info.length, true /*visible*/, i);
+      attr_info.name.c_str(), attr_info.type, field_offset, real_len, true /*visible*/, i);
     if (OB_FAIL(rc)) {
       LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, attr_info.name.c_str());
       return rc;
     }
+    // if (attr_info.type == AttrType::VECTORS) {
+    //   field_offset += attr_info.length*4;
+    // }else {
+      field_offset += real_len;
+    printf("down %d\n", field_offset);
+    //}
 
-    field_offset += attr_info.length;
   }
 
   record_size_ = field_offset;

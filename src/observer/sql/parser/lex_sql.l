@@ -80,6 +80,7 @@ QUOTE            [\'\"]
 [\-]?{DIGIT}+                           yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
 [\-]?{DIGIT}+{DOT}{DIGIT}+              yylval->floats=(float)(atof(yytext)); RETURN_TOKEN(FLOAT);
 
+
 ";"                                     RETURN_TOKEN(SEMICOLON);
 {DOT}                                   RETURN_TOKEN(DOT);
 EXIT                                    RETURN_TOKEN(EXIT);
@@ -122,6 +123,9 @@ STORAGE                                 RETURN_TOKEN(STORAGE);
 FORMAT                                  RETURN_TOKEN(FORMAT);
 LIKE                                    RETURN_TOKEN(LIKE_OP);
 NOT                                     RETURN_TOKEN(NOT);
+L2_DISTANCE                             RETURN_TOKEN(L2_DISTANCE);
+COSINE_DISTANCE                         RETURN_TOKEN(COSINE_DISTANCE);
+INNER_PRODUCT                           RETURN_TOKEN(INNER_PRODUCT);
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 "("                                     RETURN_TOKEN(LBRACE);
 ")"                                     RETURN_TOKEN(RBRACE);
@@ -141,6 +145,13 @@ NOT                                     RETURN_TOKEN(NOT);
 "/"                                     { return yytext[0]; }
 \"[^"]*\"                               yylval->string = strdup(yytext); RETURN_TOKEN(SSS);
 '[^']*\'                                yylval->string = strdup(yytext); RETURN_TOKEN(SSS);
+\[(\-?[0-9]+(\.[0-9]+)?)(,(\-?[0-9]+(\.[0-9]+)?))*\] {
+    yylval->string = strdup(yytext);
+    RETURN_TOKEN(SSS);
+}
+
+
+
 
 .                                       LOG_DEBUG("Unknown character [%c]",yytext[0]); return yytext[0];
 %%

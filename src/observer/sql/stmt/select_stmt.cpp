@@ -19,7 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 #include "sql/parser/expression_binder.h"
-
+#include <regex>
 using namespace std;
 using namespace common;
 
@@ -87,7 +87,30 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     default_table = tables[0];
   }
 
-  // create filter statement in `where` statement
+  //create filter statement in `where` statement
+  Value real;
+  std::regex pattern(R"(\[?(-?\d+(\.\d+)?)(,-?\d+(\.\d+)?)*\]?)");
+
+  for (size_t i = 0; i < select_sql.conditions.size(); i++) {
+    if(std::regex_match(select_sql.conditions[i].right_value.get_string(), pattern)) {
+      Value::cast_to(select_sql.conditions[i].right_value,AttrType::VECTORS,real);
+      select_sql.conditions[i].right_value = real;
+    }else
+      if(std::regex_match(select_sql.conditions[i].left_value.get_string(), pattern)) {
+        Value::cast_to(select_sql.conditions[i].left_value,AttrType::VECTORS,real);
+        select_sql.conditions[i].left_value = real;
+      }
+  }
+  // for (size_t i = 0; i < select_sql.conditions.size(); i++) {
+  //   if(select_sql.conditions[i].right_value.get_string().size()>0 && select_sql.conditions[i].right_value.get_string()[0] == '[') {
+  //     Value::cast_to(select_sql.conditions[i].right_value,AttrType::VECTORS,real);
+  //     select_sql.conditions[i].right_value = real;
+  //   }else
+  //   if(select_sql.conditions[i].left_value.get_string().size()>0 && select_sql.conditions[i].left_value.get_string()[0] == '[') {
+  //     Value::cast_to(select_sql.conditions[i].left_value,AttrType::VECTORS,real);
+  //     select_sql.conditions[i].left_value = real;
+  //   }
+  // }
   FilterStmt *filter_stmt = nullptr;
   RC          rc          = FilterStmt::create(db,
       default_table,
@@ -99,7 +122,6 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     LOG_WARN("cannot construct filter stmt");
     return rc;
   }
-
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
 

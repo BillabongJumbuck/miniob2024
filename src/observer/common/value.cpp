@@ -28,6 +28,11 @@ Value::Value(bool val) { set_boolean(val); }
 
 Value::Value(const char *s, int len /*= 0*/) { set_string(s, len); }
 
+Value::Value(float *vec,int size)
+{
+  set_vector(vec,size);
+}
+
 Value::Value(const Value &other)
 {
   this->attr_type_ = other.attr_type_;
@@ -36,6 +41,10 @@ Value::Value(const Value &other)
   switch (this->attr_type_) {
     case AttrType::CHARS: {
       set_string_from_other(other);
+    } break;
+
+    case AttrType::VECTORS: {
+      set_vector_from_other(other);
     } break;
 
     default: {
@@ -68,6 +77,10 @@ Value &Value::operator=(const Value &other)
       set_string_from_other(other);
     } break;
 
+    case AttrType::VECTORS: {
+      set_vector_from_other(other);
+    } break;
+
     default: {
       this->value_ = other.value_;
     } break;
@@ -94,6 +107,12 @@ void Value::reset()
 {
   switch (attr_type_) {
     case AttrType::CHARS:
+      if (own_data_ && value_.pointer_value_ != nullptr) {
+        delete[] value_.pointer_value_;
+        value_.pointer_value_ = nullptr;
+      }
+      break;
+    case AttrType::VECTORS:
       if (own_data_ && value_.pointer_value_ != nullptr) {
         delete[] value_.pointer_value_;
         value_.pointer_value_ = nullptr;
@@ -128,7 +147,12 @@ void Value::set_data(char *data, int length)
     case AttrType::DATES: {
       value_.int_value_ = *(int *)data;
       length_             = length;
-    }
+    } break;
+    case AttrType::VECTORS: {
+      set_vector(reinterpret_cast<float*>(data), length / sizeof(float));
+      length_             = length/sizeof(float);
+    } break;
+    
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
     } break;
@@ -163,6 +187,28 @@ void Value::set_date(int y, int m, int d)
   value_.int_value_ = y * 10000 + m * 100 + d;
   attr_type_ = AttrType::DATES;
 }
+
+void Value::set_vector(float* data, int size) {
+  reset();  // 清除之前的数据
+
+  // 设置类型和元素数量
+  attr_type_ = AttrType::VECTORS;
+  own_data_ = true;
+  length_ = size;  // 存储元素数量，而不是字节数
+  //printf("set_vector:%d\n",length_);
+  // 申请对齐的内存，float 通常需要对齐到 4 字节
+  float* f = new float[size];
+  value_.pointer_value_ = (char*)f;
+  //value_.pointer_value_ = static_cast<char*>(std::aligned_alloc(alignof(float), size * sizeof(float)));
+  if (value_.pointer_value_ == nullptr) {
+    std::cerr << "Memory allocation failed!" << std::endl;
+    return;
+  }
+
+  // 拷贝数据到分配的内存
+  memcpy(value_.pointer_value_, data, size * sizeof(float));
+}
+
 
 
 void Value::set_string(const char *s, int len /*= 0*/)
@@ -201,6 +247,9 @@ void Value::set_value(const Value &value)
     case AttrType::BOOLEANS: {
       set_boolean(value.get_boolean());
     } break;
+    case AttrType::VECTORS: {
+      set_vector((float*)value.get_vector(),length_);
+    } break;
     default: {
       ASSERT(false, "got an invalid value type");
     } break;
@@ -217,12 +266,35 @@ void Value::set_string_from_other(const Value &other)
   }
 }
 
+
+void Value::set_vector_from_other(const Value& other) {
+  ASSERT(other.attr_type_ == AttrType::VECTORS, "Type mismatch: expected VECTORS");
+
+  if (other.length_ > 0 && other.value_.pointer_value_ != nullptr) {
+    // 分配对齐的内存
+    value_.pointer_value_ = (char*)new float[other.length_];
+    //value_.pointer_value_ = static_cast<char*>(std::aligned_alloc(alignof(float), other.length_ * sizeof(float)));
+    if (!value_.pointer_value_) {
+      throw std::bad_alloc();
+    }
+
+    // 拷贝数据
+    memcpy(value_.pointer_value_, other.value_.pointer_value_, other.length_ * sizeof(float));
+    length_ = other.length_;
+    own_data_ = true;
+  }
+}
+
+
 const char *Value::data() const
 {
   switch (attr_type_) {
     case AttrType::CHARS: {
       return value_.pointer_value_;
     } break;
+    case AttrType::VECTORS: {
+      return value_.pointer_value_;
+    }break;
     default: {
       return (const char *)&value_;
     } break;
@@ -240,7 +312,10 @@ string Value::to_string() const
   return res;
 }
 
-int Value::compare(const Value &other) const { return DataType::type_instance(this->attr_type_)->compare(*this, other); }
+int Value::compare(const Value &other) const
+{
+  return DataType::type_instance(this->attr_type_)->compare(*this, other);
+}
 
 int Value::get_int() const
 {
@@ -337,4 +412,15 @@ bool Value::get_boolean() const
     }
   }
   return false;
+}
+
+char* Value::get_vector() const
+{
+    if (length_ == 0 || value_.pointer_value_ == nullptr) {
+        return nullptr;
+    }
+    char * result = (char*)new float[length_];
+    //char* result = static_cast<char*>(std::aligned_alloc(alignof(float), length_ * sizeof(float)));
+    memcpy(result, value_.pointer_value_, length_*sizeof(float));
+    return result;
 }
