@@ -118,7 +118,6 @@ RC FloatType::l2_distance(const Value &left, const Value &right, Value &result) 
   float distance = std::sqrt(sum);
   // 保留两位小数
   distance = std::round(distance * 100.0f) / 100.0f;
-  printf("distance is %f\n", distance);
   result.set_float(distance);  // 假设 result 支持 set_float
 
   return RC::SUCCESS;

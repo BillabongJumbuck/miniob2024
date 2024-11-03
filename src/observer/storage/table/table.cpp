@@ -31,6 +31,8 @@ See the Mulan PSL v2 for more details. */
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"
 
+#include <gtest/internal/gtest-port.h>
+
 Table::~Table()
 {
   if (record_handler_ != nullptr) {
@@ -297,7 +299,6 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   const int normal_field_start_index = table_meta_.sys_field_num();
   // 复制所有字段的值
   int   record_size = table_meta_.record_size();
-  printf("record_size=%d\n", record_size);
   char *record_data = (char *)malloc(record_size);
   memset(record_data, 0, record_size);
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
@@ -306,7 +307,6 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
     if (field->type() != value.attr_type()) {
       Value real_value;
       rc = Value::cast_to(value, field->type(), real_value);
-      printf("in table make_record:%d\n",real_value.length());
       if (OB_FAIL(rc)) {
         LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
             table_meta_.name(), field->name(), value.to_string().c_str());
@@ -330,13 +330,16 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
 {
   size_t       copy_len = field->len();
   const size_t data_len = value.length();
-  printf("copy len=%ld, data_len=%ld\n", copy_len, data_len);
   if (field->type() == AttrType::CHARS) {
     if (copy_len > data_len) {
       copy_len = data_len + 1;
     }
   }
-  printf("copy len=%ld, data_len=%ld\n", copy_len, data_len);
+  if (value.attr_type() == AttrType::VECTORS) {
+    if (copy_len != data_len*4) {
+      return RC::INVALID_ARGUMENT;
+    }
+  }
   memcpy(record_data + field->offset(), value.data(), copy_len);
   return RC::SUCCESS;
 }

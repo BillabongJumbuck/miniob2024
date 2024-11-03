@@ -89,7 +89,9 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   //create filter statement in `where` statement
   Value real;
-  std::regex pattern(R"(\[?(-?\d+(\.\d+)?)(,-?\d+(\.\d+)?)*\]?)");
+  std::regex pattern(R"(\[?\s*(-?\d+(\.\d+)?(\s*,\s*-?\d+(\.\d+)?)+)\s*\]?)");
+
+
 
   for (size_t i = 0; i < select_sql.conditions.size(); i++) {
     if(std::regex_match(select_sql.conditions[i].right_value.get_string(), pattern)) {

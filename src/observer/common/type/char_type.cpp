@@ -59,7 +59,6 @@ RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
       if (vector_str.back() == ']') {
           vector_str.pop_back();
       }
-
       // 分割字符串并解析浮点数
       std::stringstream ss(vector_str);
       std::string token;

@@ -8,7 +8,6 @@
 #include <cmath>
 
 int VectorType::compare(const Value &left, const Value &right) const {
-  printf("conpare start\n");
   Value real_left = left;
   Value real_right = right;
   if (left.attr_type_!=AttrType::VECTORS) {
@@ -46,7 +45,6 @@ int VectorType::compare(const Value &left, const Value &right) const {
 
 
 RC VectorType::add(const Value &left, const Value &right, Value &result) const {
-    printf("start add\n");
     Value real_left = left;
     Value real_right = right;
     if (left.attr_type_!=AttrType::VECTORS) {
@@ -85,7 +83,6 @@ RC VectorType::add(const Value &left, const Value &right, Value &result) const {
 
 // 减法：逐元素相减
 RC VectorType::subtract(const Value &left, const Value &right, Value &result) const {
-  printf("start subtract\n");
   Value real_left = left;
   Value real_right = right;
   if (left.attr_type_!=AttrType::VECTORS) {
@@ -119,7 +116,6 @@ RC VectorType::subtract(const Value &left, const Value &right, Value &result) co
 
 // 乘法：逐元素相乘
 RC VectorType::multiply(const Value &left, const Value &right, Value &result) const {
-  printf("start multiply\n");
   Value real_left = left;
   Value real_right = right;
   if (left.attr_type_!=AttrType::VECTORS) {
@@ -155,7 +151,6 @@ RC VectorType::to_string(const Value &val, string &result) const {
     float* vec = (float*)val.value_.pointer_value_;
     int num_elements = val.length_ ;// 获取元素数量
     vector<float> val_vector(vec, vec + num_elements);
-    //printf("in to_string element nums %d\n",num_elements);
     // 使用字符串流构建结果字符串
     std::ostringstream oss;
     oss << "[";

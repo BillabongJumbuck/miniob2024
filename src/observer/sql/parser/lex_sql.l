@@ -145,10 +145,11 @@ INNER_PRODUCT                           RETURN_TOKEN(INNER_PRODUCT);
 "/"                                     { return yytext[0]; }
 \"[^"]*\"                               yylval->string = strdup(yytext); RETURN_TOKEN(SSS);
 '[^']*\'                                yylval->string = strdup(yytext); RETURN_TOKEN(SSS);
-\[(\-?[0-9]+(\.[0-9]+)?)(,(\-?[0-9]+(\.[0-9]+)?))*\] {
+\[\ *(-?[0-9]+(\.[0-9]+)?)(\ *,\ *-?[0-9]+(\.[0-9]+)?)*\ *\]  {
     yylval->string = strdup(yytext);
     RETURN_TOKEN(SSS);
 }
+
 
 
 
@@ -159,3 +160,6 @@ INNER_PRODUCT                           RETURN_TOKEN(INNER_PRODUCT);
 void scan_string(const char *str, yyscan_t scanner) {
   yy_switch_to_buffer(yy_scan_string(str, scanner), scanner);
 }
+
+
+

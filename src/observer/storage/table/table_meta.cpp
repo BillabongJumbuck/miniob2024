@@ -72,7 +72,6 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
       //   field_offset += field_meta.len()*4;
       // }else {
         field_offset += field_meta.len();
-      printf("up %d\n", field_offset);
       //}
     }
 
@@ -98,7 +97,6 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
     //   field_offset += attr_info.length*4;
     // }else {
       field_offset += real_len;
-    printf("down %d\n", field_offset);
     //}
 
   }

@@ -195,7 +195,6 @@ void Value::set_vector(float* data, int size) {
   attr_type_ = AttrType::VECTORS;
   own_data_ = true;
   length_ = size;  // 存储元素数量，而不是字节数
-  //printf("set_vector:%d\n",length_);
   // 申请对齐的内存，float 通常需要对齐到 4 字节
   float* f = new float[size];
   value_.pointer_value_ = (char*)f;
