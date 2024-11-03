@@ -157,7 +157,7 @@ RC VectorType::to_string(const Value &val, string &result) const {
     for (int i = 0; i < num_elements; ++i) {
         oss << val_vector[i];
         if (i < num_elements - 1) {
-            oss << ", "; // 添加逗号分隔符
+            oss << ","; // 添加逗号分隔符
         }
     }
     oss << "]";
