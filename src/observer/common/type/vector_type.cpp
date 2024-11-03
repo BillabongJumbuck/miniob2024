@@ -155,7 +155,7 @@ RC VectorType::to_string(const Value &val, string &result) const {
     std::ostringstream oss;
     oss << "[";
     for (int i = 0; i < num_elements; ++i) {
-        oss << val_vector[i];
+        oss << std::round(val_vector[i] * 100.0) / 100.0;
         if (i < num_elements - 1) {
             oss << ","; // 添加逗号分隔符
         }
