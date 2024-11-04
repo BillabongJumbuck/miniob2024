@@ -364,8 +364,6 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
     return  RC::INTERNAL;
   }
 
-  bool default_value = (conjunction_type_ == Type::AND);
-  value.set_boolean(default_value);
   return rc;
 }
 
