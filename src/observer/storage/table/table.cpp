@@ -31,6 +31,8 @@ See the Mulan PSL v2 for more details. */
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"
 
+#include <gtest/internal/gtest-port.h>
+
 Table::~Table()
 {
   if (record_handler_ != nullptr) {
@@ -294,13 +296,11 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
     LOG_WARN("Input values don't match the table's schema, table name:%s", table_meta_.name());
     return RC::SCHEMA_FIELD_MISSING;
   }
-
   const int normal_field_start_index = table_meta_.sys_field_num();
   // 复制所有字段的值
   int   record_size = table_meta_.record_size();
   char *record_data = (char *)malloc(record_size);
   memset(record_data, 0, record_size);
-
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &    value = values[i];
@@ -322,7 +322,6 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
     free(record_data);
     return rc;
   }
-
   record.set_data_owner(record_data, record_size);
   return RC::SUCCESS;
 }
@@ -334,6 +333,11 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
   if (field->type() == AttrType::CHARS) {
     if (copy_len > data_len) {
       copy_len = data_len + 1;
+    }
+  }
+  if (value.attr_type() == AttrType::VECTORS) {
+    if (copy_len != data_len*4) {
+      return RC::INVALID_ARGUMENT;
     }
   }
   memcpy(record_data + field->offset(), value.data(), copy_len);

@@ -117,6 +117,10 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NOT
         JOIN
         INNER
+        L2_DISTANCE
+        COSINE_DISTANCE
+        INNER_PRODUCT
+
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -435,7 +439,8 @@ delete_stmt:    /*  delete 语句的语法解析树*/
       $$ = new ParsedSqlNode(SCF_DELETE);
       $$->deletion.relation_name = $3;
       if ($4 != nullptr) {
-        $$->deletion.conditions = $4;
+        $$->deletion.conditions.swap(*$4);
+        delete $4;
       }
       free($3);
     }
@@ -541,6 +546,15 @@ expression:
       $$ = $1; // AggrFuncExpr
     }
     // your code here
+    | L2_DISTANCE LBRACE expression COMMA expression RBRACE {
+        $$ = create_arithmetic_expression(ArithmeticExpr::Type::LD, $3, $5, sql_string, &@$);
+    }
+    | COSINE_DISTANCE LBRACE expression COMMA expression RBRACE {
+        $$ = create_arithmetic_expression(ArithmeticExpr::Type::CD, $3, $5, sql_string, &@$);
+    }
+    | INNER_PRODUCT LBRACE expression COMMA expression RBRACE {
+        $$ = create_arithmetic_expression(ArithmeticExpr::Type::IP, $3, $5, sql_string, &@$);
+    }
     ;
 
 aggr_func_expr:

@@ -367,6 +367,9 @@ public:
     MUL,
     DIV,
     NEGATIVE,
+    LD,
+    CD,
+    IP,
   };
 
 public:

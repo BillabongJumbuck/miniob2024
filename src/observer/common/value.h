@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/type/attr_type.h"
 #include "common/type/data_type.h"
 
+
 /**
  * @brief 属性的值
  * @ingroup DataType
@@ -43,10 +44,12 @@ public:
 
   Value(AttrType attr_type, char *data, int length = 4) : attr_type_(attr_type) { this->set_data(data, length); }
 
+
   explicit Value(int val);
   explicit Value(float val);
   explicit Value(bool val);
   explicit Value(const char *s, int len = 0);
+  explicit Value(float *vec, int size);
 
   Value(const Value &other);
   Value(Value &&other);
@@ -81,6 +84,19 @@ public:
     return DataType::type_instance(result.attr_type())->negative(value, result);
   }
 
+  static RC l2_distance(const Value &left, const Value &right, Value &result)
+  {
+    return DataType::type_instance(result.attr_type())->l2_distance(left, right, result);
+  }
+  static RC cosine_distance(const Value &left, const Value &right, Value &result)
+  {
+    return DataType::type_instance(result.attr_type())->cosine_distance(left, right, result);
+  }
+  static RC inner_product(const Value &left, const Value &right, Value &result)
+  {
+    return DataType::type_instance(result.attr_type())->inner_product(left, right, result);
+  }
+
   static RC cast_to(const Value &value, AttrType to_type, Value &result)
   {
     return DataType::type_instance(value.attr_type())->cast_to(value, to_type, result);
@@ -92,6 +108,7 @@ public:
   void set_value(const Value &value);
   void set_boolean(bool val);
   void set_date(int y, int m, int d);
+
 
   string to_string() const;
 
@@ -111,12 +128,15 @@ public:
   float  get_float() const;
   string get_string() const;
   bool   get_boolean() const;
+  char* get_vector() const;
 
 private:
   void set_int(int val);
   void set_float(float val);
   void set_string(const char *s, int len = 0);
   void set_string_from_other(const Value &other);
+  void set_vector_from_other(const Value &other);
+  void set_vector(float* data,int size);
 
 private:
   AttrType attr_type_ = AttrType::UNDEFINED;
@@ -128,7 +148,9 @@ private:
     float   float_value_;
     bool    bool_value_;
     char   *pointer_value_;
+    float  *vector_;
   } value_ = {.int_value_ = 0};
+
 
   /// 是否申请并占有内存, 目前对于 CHARS 类型 own_data_ 为true, 其余类型 own_data_ 为false
   bool own_data_ = false;
