@@ -199,6 +199,25 @@ void Value::set_date(int y, int m, int d)
   attr_type_ = AttrType::DATES;
 }
 
+void Value::set_vector(float* data, int size) {
+  reset();  // 清除之前的数据
+
+  // 设置类型和元素数量
+  attr_type_ = AttrType::VECTORS;
+  own_data_ = true;
+  length_ = size;  // 存储元素数量，而不是字节数
+  // 申请对齐的内存，float 通常需要对齐到 4 字节
+  float* f = new float[size];
+  value_.pointer_value_ = (char*)f;
+  //value_.pointer_value_ = static_cast<char*>(std::aligned_alloc(alignof(float), size * sizeof(float)));
+  if (value_.pointer_value_ == nullptr) {
+    std::cerr << "Memory allocation failed!" << std::endl;
+    return;
+  }
+
+  // 拷贝数据到分配的内存
+  memcpy(value_.pointer_value_, data, size * sizeof(float));
+}
 
 void Value::set_string(const char *s, int len /*= 0*/)
 {
@@ -407,4 +426,15 @@ bool Value::get_boolean() const
     }
   }
   return false;
+}
+
+char* Value::get_vector() const
+{
+  if (length_ == 0 || value_.pointer_value_ == nullptr) {
+    return nullptr;
+  }
+  char * result = (char*)new float[length_];
+  //char* result = static_cast<char*>(std::aligned_alloc(alignof(float), length_ * sizeof(float)));
+  memcpy(result, value_.pointer_value_, length_*sizeof(float));
+  return result;
 }
