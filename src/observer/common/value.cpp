@@ -63,6 +63,8 @@ Value::Value(Value &&other)
   other.length_    = 0;
 }
 
+const char Value::null_for_storage[] = "\032\032\032\0";
+
 Value &Value::operator=(const Value &other)
 {
   if (this == &other) {
@@ -128,6 +130,15 @@ void Value::reset()
 
 void Value::set_data(char *data, int length)
 {
+  // 比较data与Value::null_storage
+  const char * null_string = to_null_storage();
+  if(strcmp(data, null_string) == 0) {
+    // set_string会把类型改为CHARS!!!!
+    set_string("NULL", 4);
+    // 赋值后转NULL
+    set_null();
+    return;
+  }
   switch (attr_type_) {
     case AttrType::CHARS: {
       set_string(data, length);
@@ -152,9 +163,9 @@ void Value::set_data(char *data, int length)
       set_vector(reinterpret_cast<float*>(data), length / sizeof(float));
       length_             = length/sizeof(float);
     } break;
-    
+
     default: {
-      LOG_WARN("unknown data type: %d", attr_type_);
+      LOG_WARN("unknown data type: %s", attr_type_to_string(attr_type_));
     } break;
   }
 }
@@ -187,27 +198,6 @@ void Value::set_date(int y, int m, int d)
   value_.int_value_ = y * 10000 + m * 100 + d;
   attr_type_ = AttrType::DATES;
 }
-
-void Value::set_vector(float* data, int size) {
-  reset();  // 清除之前的数据
-
-  // 设置类型和元素数量
-  attr_type_ = AttrType::VECTORS;
-  own_data_ = true;
-  length_ = size;  // 存储元素数量，而不是字节数
-  // 申请对齐的内存，float 通常需要对齐到 4 字节
-  float* f = new float[size];
-  value_.pointer_value_ = (char*)f;
-  //value_.pointer_value_ = static_cast<char*>(std::aligned_alloc(alignof(float), size * sizeof(float)));
-  if (value_.pointer_value_ == nullptr) {
-    std::cerr << "Memory allocation failed!" << std::endl;
-    return;
-  }
-
-  // 拷贝数据到分配的内存
-  memcpy(value_.pointer_value_, data, size * sizeof(float));
-}
-
 
 
 void Value::set_string(const char *s, int len /*= 0*/)
@@ -302,6 +292,10 @@ const char *Value::data() const
 
 string Value::to_string() const
 {
+  if(this-> is_null()) {
+    return  "NULL";
+  }
+
   string res;
   RC     rc = DataType::type_instance(this->attr_type_)->to_string(*this, res);
   if (OB_FAIL(rc)) {
@@ -311,10 +305,12 @@ string Value::to_string() const
   return res;
 }
 
-int Value::compare(const Value &other) const
+const char* Value::to_null_storage()
 {
-  return DataType::type_instance(this->attr_type_)->compare(*this, other);
+  return null_for_storage;
 }
+
+int Value::compare(const Value &other) const { return DataType::type_instance(this->attr_type_)->compare(*this, other); }
 
 int Value::get_int() const
 {
@@ -411,15 +407,4 @@ bool Value::get_boolean() const
     }
   }
   return false;
-}
-
-char* Value::get_vector() const
-{
-    if (length_ == 0 || value_.pointer_value_ == nullptr) {
-        return nullptr;
-    }
-    char * result = (char*)new float[length_];
-    //char* result = static_cast<char*>(std::aligned_alloc(alignof(float), length_ * sizeof(float)));
-    memcpy(result, value_.pointer_value_, length_*sizeof(float));
-    return result;
 }

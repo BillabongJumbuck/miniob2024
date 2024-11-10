@@ -279,7 +279,15 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
   }
 
   // 尝试隐式转换
-  if (left_child->value_type() != right_child->value_type()) {
+  // 左右含有null值，则无法隐式转换
+  // 运算符为IS_NULL 或 IS_NOT_NULL , 则不进行隐式转换
+  if((left_child->type() == ExprType::VALUE && left_child->value_type() == AttrType::NULLS) ||
+      (right_child->type() == ExprType::VALUE && right_child->value_type() == AttrType::NULLS) ||
+      (expr->comp() == CompOp::IS_NULL || expr->comp() == CompOp::IS_NOT_NULL)
+      ) {
+    LOG_INFO("implicit cast not support null value");
+  }
+  else if (left_child->value_type() != right_child->value_type()) {
     auto left_to_right_cost = implicit_cast_cost(left_child->value_type(), right_child->value_type());
     auto right_to_left_cost = implicit_cast_cost(right_child->value_type(), left_child->value_type());
     if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {

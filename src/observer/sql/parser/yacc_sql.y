@@ -115,6 +115,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NE
         LIKE_OP
         NOT
+        NULL_TYPE
+        NULLABLE
+        IS
         JOIN
         INNER
         L2_DISTANCE
@@ -139,6 +142,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   char *                                     string;
   int                                        number;
   float                                      floats;
+  bool                                       boolean;
 }
 
 %token <number> NUMBER
@@ -152,6 +156,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <expression>          condition
 %type <value>               value
 %type <number>              number
+%type <boolean>             null_option
+%type <boolean>             is_null_comp
 %type <string>              relation
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
@@ -348,21 +354,42 @@ attr_def_list:
     ;
     
 attr_def:
-    ID type LBRACE number RBRACE 
+    ID type LBRACE number RBRACE null_option
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = $4;
+      $$->nullable = $6;
       free($1);
     }
-    | ID type
+    | ID type null_option
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;
+      $$->nullable = $3;
       free($1);
+    }
+    ;
+
+null_option:
+    /* empty */
+    {
+      $$ = false;
+    }
+    | NULLABLE
+    {
+      $$ = true;
+    }
+    | NULL_TYPE
+    {
+      $$ = true;
+    }
+    | NOT NULL_TYPE
+    {
+      $$ = false;
     }
     ;
 number:
@@ -376,7 +403,7 @@ type:
     | VECTOR_T { $$ = static_cast<int>(AttrType::VECTORS); }
     ;
 insert_stmt:        /*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE value value_list RBRACE 
+    INSERT INTO ID VALUES LBRACE value value_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_INSERT);
       $$->insertion.relation_name = $3;
@@ -411,15 +438,27 @@ value:
       $$ = new Value((int)$1);
       @$ = @1;
     }
-    |FLOAT {
+    | '-' NUMBER %prec UMINUS {
+      $$ = new Value(-(int)$2);
+      @$ = @2;
+    }
+    | FLOAT {
       $$ = new Value((float)$1);
       @$ = @1;
+    }
+    | '-' FLOAT %prec UMINUS {
+      $$ = new Value(-(float)$2);
+      @$ = @2;
     }
     |SSS {
       char *tmp = common::substr($1,1,strlen($1)-2);
       $$ = new Value(tmp);
       free(tmp);
       free($1);
+    }
+    | NULL_TYPE {
+      $$ = new Value();
+      $$->set_null();
     }
     ;
 storage_format:
@@ -614,6 +653,11 @@ condition:
     expression comp_op expression {
       $$ = new ComparisonExpr($2, $1, $3);
     }
+    | expression is_null_comp
+    {
+      ValueExpr *value_expr = new ValueExpr(Value(1));
+      $$ = new ComparisonExpr($2 ? IS_NULL : IS_NOT_NULL, $1, value_expr);
+    }
     | condition AND condition {
       $$ = new ConjunctionExpr(ConjunctionExpr::Type::AND, $1, $3);
     }
@@ -631,6 +675,17 @@ comp_op:
     | NE { $$ = NOT_EQUAL; }
     | LIKE_OP { $$ = LIKE; }
     | NOT LIKE_OP { $$ = NOT_LIKE; }
+    ;
+
+is_null_comp:
+    IS NULL_TYPE
+    {
+      $$ = true;
+    }
+    | IS NOT NULL_TYPE
+    {
+      $$ = false;
+    }
     ;
 
 // your code here

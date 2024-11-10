@@ -17,6 +17,10 @@ See the Mulan PSL v2 for more details. */
 
 RC SumAggregator::accumulate(const Value &value)
 {
+  if(value.is_null()) {
+    LOG_INFO("value is null in aggregate.");
+    return RC::SUCCESS;
+  }
   if (value_.attr_type() == AttrType::UNDEFINED) {
     value_ = value;
     return RC::SUCCESS;
@@ -31,12 +35,21 @@ RC SumAggregator::accumulate(const Value &value)
 
 RC SumAggregator::evaluate(Value& result)
 {
+  if(value_.attr_type() == AttrType::UNDEFINED) {
+    value_ = Value("NULL");
+    value_.set_null();
+  }
   result = value_;
   return RC::SUCCESS;
 }
 
 RC CountAggregator::accumulate(const Value &value)
 {
+  if(value.is_null()) {
+    LOG_INFO("value is null in aggregate.");
+    return RC::SUCCESS;
+  }
+
   if (value_.attr_type() == AttrType::UNDEFINED) {
     value_ = Value(1);
     return RC::SUCCESS;
@@ -61,6 +74,11 @@ RC CountAggregator::evaluate(Value& result)
 
 RC MaxAggregator::accumulate(const Value &value)
 {
+  if(value.is_null()) {
+    LOG_INFO("value is null in aggregate.");
+    return RC::SUCCESS;
+  }
+
   if (value_.attr_type() == AttrType::UNDEFINED) {
     value_ = value;
     return RC::SUCCESS;
@@ -77,12 +95,21 @@ RC MaxAggregator::accumulate(const Value &value)
 
 RC MaxAggregator::evaluate(Value& result)
 {
+  if(value_.attr_type() == AttrType::UNDEFINED) {
+    value_ = Value("NULL");
+    value_.set_null();
+  }
   result = value_;
   return RC::SUCCESS;
 }
 
 RC MinAggregator::accumulate(const Value &value)
 {
+  if(value.is_null()) {
+    LOG_INFO("value is null in aggregate.");
+    return RC::SUCCESS;
+  }
+
   if (value_.attr_type() == AttrType::UNDEFINED) {
     value_ = value;
     return RC::SUCCESS;
@@ -99,12 +126,21 @@ RC MinAggregator::accumulate(const Value &value)
 
 RC MinAggregator::evaluate(Value& result)
 {
+  if(value_.attr_type() == AttrType::UNDEFINED) {
+    value_ = Value("NULL");
+    value_.set_null();
+  }
   result = value_;
   return RC::SUCCESS;
 }
 
 RC AvgAggregator::accumulate(const Value &value)
 {
+  if(value.is_null()) {
+    LOG_INFO("value is null in aggregate.");
+    return RC::SUCCESS;
+  }
+
   if (value_.attr_type() == AttrType::UNDEFINED) {
     value_ = Value(value.get_float());
     sum_ = value.get_float();
@@ -124,6 +160,10 @@ RC AvgAggregator::accumulate(const Value &value)
 
 RC AvgAggregator::evaluate(Value& result)
 {
+  if(value_.attr_type() == AttrType::UNDEFINED) {
+    value_ = Value("NULL");
+    value_.set_null();
+  }
   result = value_;
   return RC::SUCCESS;
 }

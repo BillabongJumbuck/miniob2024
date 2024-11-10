@@ -220,7 +220,8 @@ bool DefaultConditionFilter::filter(const Record &rec) const
 
       return !(*pattern == '\0' && *str == '\0');
     }(left_value.get_string().c_str(), right_value.get_string().c_str());
-
+    case IS_NULL: return left_value.is_null();
+    case IS_NOT_NULL: return !left_value.is_null();
     default: break;
   }
 

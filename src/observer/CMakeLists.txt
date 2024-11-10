@@ -19,7 +19,9 @@ FOREACH (F ${ALL_SRC})
                 sql/operator/update_logical_operator.cpp
                 sql/operator/update_logical_operator.h
                 sql/operator/update_physical_oprator.cpp
-                sql/operator/update_physical_oprator.h)
+                sql/operator/update_physical_oprator.h
+                common/type/null_type.cpp
+                common/type/null_type.h)
         MESSAGE("Use " ${F})
     ENDIF()
 
