@@ -379,7 +379,7 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
       if (rc == RC::INVALID_ARGUMENT) {
         LOG_DEBUG("divide by zero!");
         right_value.set_boolean(false);
-        rc = RC::SUCCESS;
+        rc =   RC::SUCCESS;
       }else if (rc != RC::SUCCESS) {
         LOG_WARN("failed to get value by right child expression. rc=%s", strrc(rc));
         return rc;
