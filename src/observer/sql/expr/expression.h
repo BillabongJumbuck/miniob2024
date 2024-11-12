@@ -21,7 +21,12 @@ See the Mulan PSL v2 for more details. */
 #include "storage/field/field.h"
 #include "sql/expr/aggregator.h"
 #include "storage/common/chunk.h"
+#include "sql/operator/logical_operator.h"
+// #include "sql/operator/physical_operator.h"
 
+class Stmt;
+class LogicalOperator;
+// class PhysicalOperator;
 class Tuple;
 
 /**
@@ -47,6 +52,7 @@ enum class ExprType
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
   AGGREGATION,  ///< 聚合运算
+  SUBQUERY,     ///< 子查询
 };
 
 /**
@@ -476,4 +482,26 @@ public:
 private:
   Type                        aggregate_type_;
   std::unique_ptr<Expression> child_;
+};
+
+class SubQueryExpr : public Expression
+{
+public:
+  SubQueryExpr(SelectSqlNode select_sql_node);
+  virtual ~SubQueryExpr() = default;
+  ExprType type() const override { return ExprType::SUBQUERY; }
+  RC get_value(const Tuple &tuple, Value &value) const override;
+  AttrType value_type() const override;
+
+
+  RC Create_stmt(Db *db);
+  RC LogicalPlanGenerate();
+  RC PhysicalPlanGenerate();
+
+private:
+
+  SelectSqlNode select_sql_node_;
+  Stmt *select_stmt_;
+  unique_ptr<LogicalOperator> logical_plan_ = nullptr;
+  // unique_ptr<PhysicalOperator> physical_operator = nullptr;
 };

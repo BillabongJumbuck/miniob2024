@@ -250,6 +250,14 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
       LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
       return rc;
     }
+  }else if(left_child-> type() == ExprType::SUBQUERY) {
+    auto subquery_expr = dynamic_cast<SubQueryExpr*>(left_child.get());
+    rc = subquery_expr->Create_stmt(db);
+    // 判断rc
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to process subquery expression. rc=%s", strrc(rc));
+      return rc;
+    }
   }
 
   // Expression *right_child = expr->right().get();
@@ -274,6 +282,14 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
     // 判断rc
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  }else if(right_child-> type() == ExprType::SUBQUERY) {
+    auto subquery_expr = dynamic_cast<SubQueryExpr*>(right_child.get());
+    rc = subquery_expr->Create_stmt(db);
+    // 判断rc
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to process subquery expression. rc=%s", strrc(rc));
       return rc;
     }
   }

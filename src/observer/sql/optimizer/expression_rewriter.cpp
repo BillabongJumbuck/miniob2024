@@ -143,7 +143,6 @@ RC ExpressionRewriter::rewrite_expression(unique_ptr<Expression> &expr, bool &ch
         change_made = true;
       }
     } break;
-
     default: {
       // do nothing
     } break;

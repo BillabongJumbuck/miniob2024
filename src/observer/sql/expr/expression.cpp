@@ -20,6 +20,12 @@ See the Mulan PSL v2 for more details. */
 
 #include <gtest/internal/gtest-internal.h>
 
+#include <utility>
+#include <sql/optimizer/logical_plan_generator.h>
+#include <sql/optimizer/physical_plan_generator.h>
+#include <sql/stmt/select_stmt.h>
+
+
 using namespace std;
 
 RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
@@ -752,3 +758,46 @@ RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &ty
   }
   return rc;
 }
+
+SubQueryExpr::SubQueryExpr(SelectSqlNode select_sql_node)
+  : select_sql_node_(std::move(select_sql_node))
+{
+}
+
+RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const { return RC::UNIMPLEMENTED;
+}
+
+AttrType SubQueryExpr::value_type() const{
+  auto stmt = dynamic_cast<SelectStmt*>(this->select_stmt_);
+  auto& query = stmt->query_expressions();
+  if(query.size() != 1) {
+    return AttrType::UNDEFINED;
+  }else {
+    return query[0]->value_type();
+  }
+}
+
+RC SubQueryExpr::Create_stmt(Db *db){
+  return SelectStmt::create(db, this->select_sql_node_, this->select_stmt_);
+}
+
+RC SubQueryExpr::LogicalPlanGenerate(){
+  RC rc = LogicalPlanGenerator::create(this->select_stmt_, this->logical_plan_);
+  // 判断RC
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to create logical plan in sub query");
+    return rc;
+  }
+  return RC::SUCCESS;
+}
+
+// RC SubQueryExpr::PhysicalPlanGenerate(){
+//   RC rc = PhysicalPlanGenerator::create(*(this->logical_plan_), this->physical_operator);
+//   // 判断RC
+//   if (OB_FAIL(rc)) {
+//     LOG_WARN("failed to create logical plan in sub query");
+//     return rc;
+//   }
+//   return RC::SUCCESS;
+// }
+
