@@ -330,6 +330,9 @@ RC PlainCommunicator::write_tuple_result(SqlResult *sql_result)
       return rc;
     }
   }
+  if (rc == RC::RECORD_EOF) {
+    return  RC::SUCCESS;
+  }
 
   if(OB_FAIL(rc)) {
     return rc;
