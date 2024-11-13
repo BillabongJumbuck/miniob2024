@@ -387,7 +387,7 @@ RC ComparisonExpr::compare_subquery_right(const Value &left, bool &value) const 
     case GREAT_THAN:
       if (result_vector.size() > 1) {
         LOG_WARN("subquery result size is more than one");
-        return RC::INTERNAL;
+        return RC::ERROR_IN_SSQ;
       } else if(result_vector.size() == 0) {
         value = false;
         return RC::SUCCESS;

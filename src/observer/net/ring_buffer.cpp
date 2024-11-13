@@ -104,3 +104,12 @@ RC RingBuffer::write(const char *data, int32_t size, int32_t &write_size)
 
   return rc;
 }
+
+RC RingBuffer::clear()
+{
+  // 释放  vector<char> buffer_;         ///< 缓存使用的内存，使用vector方便管理
+  buffer_ = std::vector<char>(capacity());
+  write_pos_  = 0;
+  data_size_  = 0;
+  return RC::SUCCESS;
+}
