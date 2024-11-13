@@ -172,6 +172,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <expression>          expression
 %type <expression>          aggr_func_expr
 %type <expression>          sub_query_expr
+%type <expression>          value_list_expr
+%type <value_list>          value_list_ssq
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
 %type <sql_node>            calc_stmt
@@ -589,6 +591,9 @@ expression:
     | sub_query_expr {
       $$ = $1; // SubQueryExpr
     }
+    | value_list_expr {
+      $$ = $1; // ValueListExpr
+    }
     // your code here
     | L2_DISTANCE LBRACE expression COMMA expression RBRACE {
         $$ = create_arithmetic_expression(ArithmeticExpr::Type::LD, $3, $5, sql_string, &@$);
@@ -612,6 +617,36 @@ sub_query_expr:
     LBRACE select_stmt RBRACE
     {
       $$ = new SubQueryExpr(std::move($2->selection));
+      delete $2;
+    }
+    ;
+
+value_list_expr:
+    LBRACE value value_list_ssq RBRACE
+    {
+      ValueListExpr* value_list_expr = new ValueListExpr();
+      if($3 != nullptr){
+        value_list_expr->get_value_list().swap(*$3);
+        delete $3;
+      }
+      value_list_expr->get_value_list().emplace_back(*$2);
+      std::reverse(value_list_expr->get_value_list().begin(), value_list_expr->get_value_list().end());
+      delete $2;
+      $$ = value_list_expr;
+    }
+
+value_list_ssq:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | COMMA value value_list_ssq  {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<Value>;
+      }
+      $$->emplace_back(*$2);
       delete $2;
     }
     ;

@@ -277,7 +277,12 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
     rc = compare_subquery_left(right_value, bool_value);
   }else if(right_->type() == ExprType::SUBQUERY) {
     rc = compare_subquery_right(left_value, bool_value);
-  }else {
+  }else if(left_ -> type() == ExprType::VALUELIST) {
+    rc = compare_valuelist(true, right_value, bool_value);
+  }else if(right_-> type() == ExprType::VALUELIST) {
+      rc = compare_valuelist(false, left_value, bool_value);
+  }
+  else {
     rc = compare_value(left_value, right_value, bool_value);
   }
   if (rc == RC::SUCCESS) {
@@ -390,11 +395,46 @@ RC ComparisonExpr::compare_subquery_right(const Value &left, bool &value) const 
         return compare_value(left, result_vector[0], value);
       }
 
-    default:
-      LOG_WARN("unsupported comparison. %d", comp_);
+    default: LOG_WARN("unsupported comparison. %d", comp_);
     return RC::INTERNAL;
   }
 }
+
+RC ComparisonExpr::compare_valuelist(bool is_left,const Value &a, bool &value) const{
+  ValueListExpr* expr = nullptr;
+  if(is_left) {
+    expr = dynamic_cast<ValueListExpr*>(left_.get());
+  }else {
+    expr = dynamic_cast<ValueListExpr*>(right_.get());
+  }
+  std::vector<Value> values_list = expr->get_value_list();
+  value = false;
+
+  switch (comp_) {
+    case IN:
+      for (auto & iter : values_list) {
+      if (a.compare(iter) == 0) {
+        value = true;
+        break;
+      }
+    }
+    return RC::SUCCESS;
+
+    case NOT_IN:
+      value = true;
+      for (auto & iter : values_list) {
+          if (a.compare(iter) == 0) {
+            value = false;
+            break;
+        }
+      }
+      return RC::SUCCESS;
+    default:
+      LOG_WARN("unsupported comparison. %d", comp_);
+      return RC::INTERNAL;
+  }
+}
+
 
 RC ComparisonExpr::eval(Chunk &chunk, std::vector<uint8_t> &select)
 {
@@ -913,4 +953,28 @@ RC SubQueryExpr::LogicalPlanGenerate(){
   }
   return RC::SUCCESS;
 }
+
+//////////////////////////////////////////////////////////////////////////////
+ValueListExpr::ValueListExpr()
+{
+  this->value_list_ = std::vector<Value>();
+}
+
+RC ValueListExpr::get_value(const Tuple &tuple, Value &value) const {
+  if(this->value_list_.size() == 0) {
+    value.set_null();
+  }else {
+    value.set_value(this->value_list_[0]);
+  }
+  return RC::SUCCESS;
+}
+
+AttrType ValueListExpr::value_type() const{
+  if(this->value_list_.size() == 0) {
+      return AttrType::UNDEFINED;
+  }else{
+    return this->value_list_[0].attr_type();
+  }
+}
+
 

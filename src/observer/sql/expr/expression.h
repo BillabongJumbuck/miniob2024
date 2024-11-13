@@ -51,6 +51,7 @@ enum class ExprType
   ARITHMETIC,   ///< 算术运算
   AGGREGATION,  ///< 聚合运算
   SUBQUERY,     ///< 子查询
+  VALUELIST     ///< 多个值的列表
 };
 
 /**
@@ -316,6 +317,7 @@ public:
    */
   RC compare_subquery_left(const Value &right, bool &value) const;
   RC compare_subquery_right(const Value &left, bool &value) const;
+  RC compare_valuelist(bool is_left, const Value &a, bool &value) const;
 
   bool match_pattern(const char* pattern, const char* str) const;
 
@@ -516,4 +518,19 @@ private:
   unique_ptr<LogicalOperator> logical_plan_ = nullptr;
   std::vector<Value> sub_query_result;
   bool has_result = false;
+};
+
+class ValueListExpr : public Expression
+{
+public:
+  ValueListExpr();
+  virtual ~ValueListExpr() = default;
+  ExprType type() const override { return ExprType::VALUELIST; }
+  RC get_value(const Tuple &tuple, Value &value) const override;
+  AttrType value_type() const override;
+
+  void add_value(const Value &value) { value_list_.push_back(value); }
+  std::vector<Value>& get_value_list() { return value_list_; }
+private:
+  std::vector<Value> value_list_;
 };
