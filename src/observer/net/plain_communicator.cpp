@@ -320,6 +320,11 @@ RC PlainCommunicator::write_tuple_result(SqlResult *sql_result)
     }
   }
 
+  if(rc == RC::INTERNAL) {
+      LOG_WARN("rc = %s", strrc(rc));
+      return rc;
+  }
+
   LOG_INFO("is empty =  %s", is_empty ? "true" : "false");
   if(is_empty) {
     TupleSchema tuple_schamema = sql_result->tuple_schema();

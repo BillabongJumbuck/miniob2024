@@ -273,11 +273,127 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
   }
 
   bool bool_value = false;
-  rc = compare_value(left_value, right_value, bool_value);
+  if(left_->type() == ExprType::SUBQUERY) {
+    rc = compare_subquery_left(right_value, bool_value);
+  }else if(right_->type() == ExprType::SUBQUERY) {
+    rc = compare_subquery_right(left_value, bool_value);
+  }else {
+    rc = compare_value(left_value, right_value, bool_value);
+  }
   if (rc == RC::SUCCESS) {
     value.set_boolean(bool_value);
   }
   return rc;
+}
+
+RC ComparisonExpr::compare_subquery_left(const Value &right, bool &value) const {
+  SubQueryExpr* subquery_expr = dynamic_cast<SubQueryExpr*>(left_.get());
+  std::vector<Value> result_vector = subquery_expr->get_result_vector();
+  value = false;
+
+  switch (comp_) {
+    case IN:
+      for (auto iter = result_vector.begin(); iter != result_vector.end(); iter++) {
+        if (right.compare(*iter) == 0) {
+          value = true;
+          break;
+        }
+      }
+    return RC::SUCCESS;
+
+    case NOT_IN:
+      value = true;
+      for (auto iter = result_vector.begin(); iter != result_vector.end(); iter++) {
+        if (right.compare(*iter) == 0) {
+          value = false;
+          break;
+      }
+    }
+    return RC::SUCCESS;
+
+    case EXISTS:
+      value = result_vector.size() > 0;
+    return RC::SUCCESS;
+
+    case NOT_EXISTS:
+      value = result_vector.size() == 0;
+    return RC::SUCCESS;
+
+    case EQUAL_TO:
+    case LESS_EQUAL:
+    case NOT_EQUAL:
+    case LESS_THAN:
+    case GREAT_EQUAL:
+    case GREAT_THAN:
+      if (result_vector.size() > 1) {
+        LOG_WARN("subquery result size is more than one");
+        return RC::INTERNAL;
+      }else if(result_vector.size() == 0) {
+        value = false;
+        return RC::SUCCESS;
+      }else {
+        return compare_value(result_vector[0], right, value);
+      }
+
+    default:
+      LOG_WARN("unsupported comparison. %d", comp_);
+    return RC::INTERNAL;
+  }
+}
+
+RC ComparisonExpr::compare_subquery_right(const Value &left, bool &value) const {
+  SubQueryExpr* subquery_expr = dynamic_cast<SubQueryExpr*>(right_.get());
+  std::vector<Value> result_vector = subquery_expr->get_result_vector();
+  value = false;
+
+  switch (comp_) {
+    case IN:
+      for (auto iter = result_vector.begin(); iter != result_vector.end(); iter++) {
+        if (left.compare(*iter) == 0) {
+          value = true;
+          break;
+        }
+      }
+    return RC::SUCCESS;
+
+    case NOT_IN:
+      value = true;
+    for (auto iter = result_vector.begin(); iter != result_vector.end(); iter++) {
+      if (left.compare(*iter) == 0) {
+        value = false;
+        break;
+      }
+    }
+    return RC::SUCCESS;
+
+    case EXISTS:
+      value = result_vector.size() > 0;
+    return RC::SUCCESS;
+
+    case NOT_EXISTS:
+      value = result_vector.size() == 0;
+    return RC::SUCCESS;
+
+    case EQUAL_TO:
+    case LESS_EQUAL:
+    case NOT_EQUAL:
+    case LESS_THAN:
+    case GREAT_EQUAL:
+    case GREAT_THAN:
+      if (result_vector.size() > 1) {
+        LOG_WARN("subquery result size is more than one");
+        return RC::INTERNAL;
+      } else if(result_vector.size() == 0) {
+        value = false;
+        return RC::SUCCESS;
+      } else {
+        return compare_value(left, result_vector[0], value);
+      }
+
+    default:
+      LOG_WARN("unsupported comparison. %d", comp_);
+    return RC::INTERNAL;
+  }
 }
 
 RC ComparisonExpr::eval(Chunk &chunk, std::vector<uint8_t> &select)
@@ -762,9 +878,16 @@ RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &ty
 SubQueryExpr::SubQueryExpr(SelectSqlNode select_sql_node)
   : select_sql_node_(std::move(select_sql_node))
 {
+  this->sub_query_result = std::vector<Value>();
 }
 
-RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const { return RC::UNIMPLEMENTED;
+RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const {
+  if(this->sub_query_result.size() == 0) {
+    value.set_null();
+  }else {
+    value.set_value(this->sub_query_result[0]);
+  }
+  return RC::SUCCESS;
 }
 
 AttrType SubQueryExpr::value_type() const{
@@ -790,14 +913,4 @@ RC SubQueryExpr::LogicalPlanGenerate(){
   }
   return RC::SUCCESS;
 }
-
-// RC SubQueryExpr::PhysicalPlanGenerate(){
-//   RC rc = PhysicalPlanGenerator::create(*(this->logical_plan_), this->physical_operator);
-//   // 判断RC
-//   if (OB_FAIL(rc)) {
-//     LOG_WARN("failed to create logical plan in sub query");
-//     return rc;
-//   }
-//   return RC::SUCCESS;
-// }
 

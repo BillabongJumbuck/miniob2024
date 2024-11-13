@@ -22,11 +22,9 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/aggregator.h"
 #include "storage/common/chunk.h"
 #include "sql/operator/logical_operator.h"
-// #include "sql/operator/physical_operator.h"
 
 class Stmt;
 class LogicalOperator;
-// class PhysicalOperator;
 class Tuple;
 
 /**
@@ -312,7 +310,13 @@ public:
    * @param value the result of comparison
    */
   RC compare_value(const Value &left, const Value &right, bool &value) const;
-  
+
+  /**
+   * 比较含有子查寻的表达式
+   */
+  RC compare_subquery_left(const Value &right, bool &value) const;
+  RC compare_subquery_right(const Value &left, bool &value) const;
+
   bool match_pattern(const char* pattern, const char* str) const;
 
   template <typename T>
@@ -493,15 +497,23 @@ public:
   RC get_value(const Tuple &tuple, Value &value) const override;
   AttrType value_type() const override;
 
+  SelectSqlNode& select_sql_node() { return select_sql_node_; }
+  Stmt* select_stmt() { return select_stmt_; }
+  unique_ptr<LogicalOperator> &logical_plan() { return logical_plan_; }
+  void add_result(const Value& value) { sub_query_result.push_back(value); }
+  vector<Value>& get_result_vector() { return sub_query_result; }
+  void set_has_result() { has_result = true; }
+  bool has_result_vector() { return has_result; }
+
 
   RC Create_stmt(Db *db);
   RC LogicalPlanGenerate();
-  RC PhysicalPlanGenerate();
 
 private:
 
   SelectSqlNode select_sql_node_;
   Stmt *select_stmt_;
   unique_ptr<LogicalOperator> logical_plan_ = nullptr;
-  // unique_ptr<PhysicalOperator> physical_operator = nullptr;
+  std::vector<Value> sub_query_result;
+  bool has_result = false;
 };
