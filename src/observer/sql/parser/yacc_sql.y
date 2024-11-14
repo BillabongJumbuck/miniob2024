@@ -123,6 +123,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         L2_DISTANCE
         COSINE_DISTANCE
         INNER_PRODUCT
+        IN_OP
+        EXISTS_OP
 
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
@@ -169,6 +171,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <relation_list>       rel_list
 %type <expression>          expression
 %type <expression>          aggr_func_expr
+%type <expression>          sub_query_expr
+%type <expression>          value_list_expr
+%type <value_list>          value_list_ssq
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
 %type <sql_node>            calc_stmt
@@ -583,6 +588,12 @@ expression:
     | aggr_func_expr {
       $$ = $1; // AggrFuncExpr
     }
+    | sub_query_expr {
+      $$ = $1; // SubQueryExpr
+    }
+    | value_list_expr {
+      $$ = $1; // ValueListExpr
+    }
     // your code here
     | L2_DISTANCE LBRACE expression COMMA expression RBRACE {
         $$ = create_arithmetic_expression(ArithmeticExpr::Type::LD, $3, $5, sql_string, &@$);
@@ -599,6 +610,44 @@ aggr_func_expr:
     ID LBRACE expression RBRACE
     {
       $$ = create_aggregate_expression($1, $3, sql_string, &@$);
+    }
+    ;
+
+sub_query_expr:
+    LBRACE select_stmt RBRACE
+    {
+      $$ = new SubQueryExpr(std::move($2->selection));
+      delete $2;
+    }
+    ;
+
+value_list_expr:
+    LBRACE value value_list_ssq RBRACE
+    {
+      ValueListExpr* value_list_expr = new ValueListExpr();
+      if($3 != nullptr){
+        value_list_expr->get_value_list().swap(*$3);
+        delete $3;
+      }
+      value_list_expr->get_value_list().emplace_back(*$2);
+      std::reverse(value_list_expr->get_value_list().begin(), value_list_expr->get_value_list().end());
+      delete $2;
+      $$ = value_list_expr;
+    }
+
+value_list_ssq:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | COMMA value value_list_ssq  {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<Value>;
+      }
+      $$->emplace_back(*$2);
+      delete $2;
     }
     ;
 
@@ -675,6 +724,10 @@ comp_op:
     | NE { $$ = NOT_EQUAL; }
     | LIKE_OP { $$ = LIKE; }
     | NOT LIKE_OP { $$ = NOT_LIKE; }
+    | IN_OP {$$ = IN; }
+    | NOT IN_OP {$$ = NOT_IN;}
+    | EXISTS_OP {$$ = EXISTS;}
+    | NOT EXISTS_OP {$$ = NOT_EXISTS; }
     ;
 
 is_null_comp:

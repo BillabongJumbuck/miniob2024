@@ -174,6 +174,7 @@ RC PlainCommunicator::write_result(SessionEvent *event, bool &need_disconnect)
       return rc;
     }
   }
+  // 这一行会刷新控制台
   writer_->flush();  // TODO handle error
   return rc;
 }
@@ -244,8 +245,18 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
     rc = write_tuple_result(sql_result);
   }
 
+  // ERROR_IN_SSQ单独处理
   if (OB_FAIL(rc)) {
-    return rc;
+    if(rc != RC::ERROR_IN_SSQ) {
+      return rc;
+    }
+  }
+
+  // ERROR_IN_SSQ单独处理
+  if(rc == RC::ERROR_IN_SSQ) {
+    writer_->clear();
+    sql_result->set_return_code(rc);
+    return write_state(event, need_disconnect);
   }
 
   if (cell_num == 0) {
@@ -318,6 +329,13 @@ RC PlainCommunicator::write_tuple_result(SqlResult *sql_result)
       sql_result->close();
       return rc;
     }
+  }
+  if (rc == RC::RECORD_EOF) {
+    return  RC::SUCCESS;
+  }
+
+  if(OB_FAIL(rc)) {
+    return rc;
   }
 
   LOG_INFO("is empty =  %s", is_empty ? "true" : "false");

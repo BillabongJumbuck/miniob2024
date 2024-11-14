@@ -42,22 +42,22 @@ public:
   LogicalPlanGenerator()          = default;
   virtual ~LogicalPlanGenerator() = default;
 
-  RC create(Stmt *stmt, std::unique_ptr<LogicalOperator> &logical_operator);
+  static RC create(Stmt *stmt, std::unique_ptr<LogicalOperator> &logical_operator);
 
 private:
-  RC create_plan(CalcStmt *calc_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
-  RC create_plan(SelectStmt *select_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
-  RC create_plan(FilterStmt *filter_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
-  RC create_plan(InsertStmt *insert_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
-  RC create_plan(DeleteStmt *delete_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
-  RC create_plan(ExplainStmt *explain_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
-  RC create_plan(UpdateStmt *update_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
-  RC create_plan_2(FilterStmt *filter_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
+  static RC create_plan(CalcStmt *calc_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
+  static RC create_plan(SelectStmt *select_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
+  static RC create_plan(FilterStmt *filter_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
+  static RC create_plan(InsertStmt *insert_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
+  static RC create_plan(DeleteStmt *delete_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
+  static RC create_plan(ExplainStmt *explain_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
+  static RC create_plan(UpdateStmt *update_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
+  static RC create_plan_2(FilterStmt *filter_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
 
-  RC create_group_by_plan(SelectStmt *select_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
+  static RC create_group_by_plan(SelectStmt *select_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
 
-  int implicit_cast_cost(AttrType from, AttrType to);
-  RC traversal(ConjunctionExpr *expr, Table *default_table, Db *db);
-  RC comparison_process(ComparisonExpr *expr, Table *default_table, Db *db);
-  RC arithmetic_process(ArithmeticExpr *expr, Table *default_table, Db *db);
+  static int implicit_cast_cost(AttrType from, AttrType to);
+  static RC traversal(ConjunctionExpr *expr, Table *default_table, Db *db);
+  static RC comparison_process(ComparisonExpr *expr, Table *default_table, Db *db);
+  static RC arithmetic_process(ArithmeticExpr *expr, Table *default_table, Db *db);
 };

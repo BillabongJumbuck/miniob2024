@@ -130,3 +130,8 @@ RC BufferedWriter::flush_internal(int32_t size)
 
   return rc;
 }
+
+RC BufferedWriter::clear()
+{
+  return buffer_.clear();
+}

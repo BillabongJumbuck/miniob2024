@@ -13,6 +13,8 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/optimizer/expression_rewriter.h"
+
+#include "subquery_simplification_rule.h"
 #include "common/log/log.h"
 #include "sql/optimizer/comparison_simplification_rule.h"
 #include "sql/optimizer/conjunction_simplification_rule.h"
@@ -23,6 +25,7 @@ ExpressionRewriter::ExpressionRewriter()
 {
   expr_rewrite_rules_.emplace_back(new ComparisonSimplificationRule);
   expr_rewrite_rules_.emplace_back(new ConjunctionSimplificationRule);
+  expr_rewrite_rules_.emplace_back(new SubQuerySimplificationRule);
 }
 
 RC ExpressionRewriter::rewrite(unique_ptr<LogicalOperator> &oper, bool &change_made)
@@ -143,7 +146,6 @@ RC ExpressionRewriter::rewrite_expression(unique_ptr<Expression> &expr, bool &ch
         change_made = true;
       }
     } break;
-
     default: {
       // do nothing
     } break;

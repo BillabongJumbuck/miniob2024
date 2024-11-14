@@ -13,6 +13,8 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/optimizer/rewriter.h"
+
+#include "subquery_simplification_rule.h"
 #include "common/log/log.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/optimizer/expression_rewriter.h"
