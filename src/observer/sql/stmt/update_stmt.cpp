@@ -77,10 +77,13 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   }
 
   // 检查类型是否一致
-  AttrType type = update.value->value_type();
-  if( /*!value.is_null() && */ type != field_meta->type()) {
-    LOG_WARN("invalid argument. db=%p, attr_name=%p", db, attr_name);
-    return RC::INVALID_ARGUMENT;
+  if(update.value -> type() == ExprType::VALUE) {
+    Value value = dynamic_cast<ValueExpr *>(update.value)->get_value();
+
+    if( !value.is_null() &&  value.attr_type() != field_meta->type()) {
+      LOG_WARN("invalid argument. db=%p, attr_name=%p", db, attr_name);
+      return RC::INVALID_ARGUMENT;
+    }
   }
 
   // // 检查是否将null插入非null属性
