@@ -69,10 +69,12 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     subquery_physical_operator->close();
     subquery_expr->set_has_result();
 
-    if(subquery_expr->get_result_vector().size() != 1) {
+    if(subquery_expr->get_result_vector().size() > 1) {
       LOG_WARN("subquery result size is not 1!");
       return RC::INVALID_ARGUMENT;
-    }else {
+    }else if(subquery_expr->get_result_vector().size() == 0) {
+      value.set_null();
+    }else  {
       value = subquery_expr->get_result_vector()[0];
     }
   }else {
