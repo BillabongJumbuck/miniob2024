@@ -29,12 +29,12 @@ class FieldMeta;
 class UpdateStmt : public Stmt
 {
 public:
-  UpdateStmt(Table *table, const FieldMeta *field_meta, Value value,  FilterStmt *filter_stmt);
+  UpdateStmt(Table *table, const FieldMeta *field_meta, Expression* value,  FilterStmt *filter_stmt);
   ~UpdateStmt() override;
 
   Table *table() const { return table_; }
   const FieldMeta *field_meta() const { return field_meta_; }
-  Value value() const { return value_; }
+  Expression* value() const { return value_; }
   FilterStmt *filter_stmt() const { return filter_stmt_; }
 
   StmtType type() const override { return StmtType::UPDATE; }
@@ -44,6 +44,6 @@ public:
 private:
   Table *table_ = nullptr;
   const FieldMeta *field_meta_ = nullptr;
-  Value value_;
+  Expression* value_;
   FilterStmt *filter_stmt_ = nullptr;
 };

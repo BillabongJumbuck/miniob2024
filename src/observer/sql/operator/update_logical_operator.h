@@ -14,18 +14,18 @@
 
 class UpdateLogicalOperator : public LogicalOperator {
 public:
-  UpdateLogicalOperator(Table *table, const FieldMeta *field_meta, Value value);
+  UpdateLogicalOperator(Table *table, const FieldMeta *field_meta, Expression* value);
   virtual ~UpdateLogicalOperator() = default;
 
   LogicalOperatorType type() const override {return LogicalOperatorType::UPDATE;}
   Table *table() const {return table_;}
   const FieldMeta *field_meta() const {return field_meta_;}
-  Value value() const {return value_;}
+  Expression* value() const {return value_;}
 
 private:
   Table *table_ = nullptr;
   const FieldMeta *field_meta_ = nullptr;
-  Value value_;
+  Expression* value_;
 };
 
 

@@ -609,7 +609,7 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, std::unique_ptr<Lo
 {
   Table *table = update_stmt->table();
   const FieldMeta *field_meta = update_stmt->field_meta();
-  Value value = update_stmt->value();
+  Expression* value = update_stmt->value();
   FilterStmt                 *filter_stmt = update_stmt->filter_stmt();
   unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_WRITE));
 

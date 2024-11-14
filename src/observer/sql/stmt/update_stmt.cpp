@@ -21,7 +21,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <storage/table/table.h>
 
-UpdateStmt::UpdateStmt(Table *table, const FieldMeta *field_meta, Value value,  FilterStmt *filter_stmt)
+UpdateStmt::UpdateStmt(Table *table, const FieldMeta *field_meta, Expression* value,  FilterStmt *filter_stmt)
 {
   table_ = table;
   field_meta_ = field_meta;
@@ -67,18 +67,27 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     return RC::SCHEMA_FIELD_NOT_EXIST;
   }
 
+  if(update.value -> type() == ExprType::SUBQUERY) {
+    SubQueryExpr *subquery_expr = dynamic_cast<SubQueryExpr *>(update.value);
+    RC rc = subquery_expr->Create_stmt(db);
+    if(OB_FAIL(rc)) {
+      LOG_WARN("can not create stmt in subquery expr in update");
+      return rc;
+    }
+  }
+
   // 检查类型是否一致
-  Value value = update.value;
-  if(!value.is_null() && value.attr_type() != field_meta->type()) {
+  AttrType type = update.value->value_type();
+  if( /*!value.is_null() && */ type != field_meta->type()) {
     LOG_WARN("invalid argument. db=%p, attr_name=%p", db, attr_name);
     return RC::INVALID_ARGUMENT;
   }
 
-  // 检查是否将null插入非null属性
-  if(value.is_null() && !field_meta->is_nullable()) {
-    LOG_WARN("invalid argument. db=%p, attr_name=%p", db, attr_name);
-    return RC::INVALID_ARGUMENT;
-  }
+  // // 检查是否将null插入非null属性
+  // if(value.is_null() && !field_meta->is_nullable()) {
+  //   LOG_WARN("invalid argument. db=%p, attr_name=%p", db, attr_name);
+  //   return RC::INVALID_ARGUMENT;
+  // }
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt;
@@ -104,6 +113,6 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     }
   }
 
-  stmt = new UpdateStmt(table, field_meta, value, filter_stmt);
+  stmt = new UpdateStmt(table, field_meta, update.value, filter_stmt);
   return RC::SUCCESS;
 }
