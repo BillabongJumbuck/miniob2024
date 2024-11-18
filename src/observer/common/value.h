@@ -97,6 +97,15 @@ public:
   {
     return DataType::type_instance(result.attr_type())->inner_product(left, right, result);
   }
+  static RC length(const Value &val,Value &result)
+  {
+    return DataType::type_instance(result.attr_type())->length(val, result);
+  }
+  static RC round(const Value &left, const Value &right, Value &result)
+  {
+    return DataType::type_instance(result.attr_type())->round(left, right, result);
+  }
+
 
   static RC cast_to(const Value &value, AttrType to_type, Value &result)
   {

@@ -202,3 +202,11 @@ RC FloatType::inner_product(const Value &left, const Value &right, Value &result
 
   return RC::SUCCESS;
 }
+
+
+RC FloatType::round(const Value &left_value,const Value &right_value,Value &result) const
+{
+  float res = std::round(left_value.get_float() * std::pow(10, right_value.get_int())) / std::pow(10, right_value.get_int());
+  result.set_float(res);
+  return RC::SUCCESS;
+}

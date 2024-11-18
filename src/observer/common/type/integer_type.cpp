@@ -15,6 +15,8 @@ See the Mulan PSL v2 for more details. */
 #include "common/type/integer_type.h"
 #include "common/value.h"
 
+#include <cmath>
+
 int IntegerType::compare(const Value &left, const Value &right) const
 {
   ASSERT(left.attr_type() == AttrType::INTS, "left type is not integer");
@@ -106,5 +108,18 @@ RC IntegerType::cast_to(const Value &val, AttrType type, Value &result) const
     }break;
     default: return RC::UNIMPLEMENTED;
   }
+  return RC::SUCCESS;
+}
+
+RC IntegerType::length(const Value &val,Value &result) const
+{
+  result.set_int(val.length_);
+  return RC::SUCCESS;
+}
+
+RC IntegerType::round(const Value &left_value,const Value &right_value,Value &result) const
+{
+  int res = std::round(left_value.get_float());
+  result.set_int(res);
   return RC::SUCCESS;
 }

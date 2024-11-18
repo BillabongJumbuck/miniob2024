@@ -106,3 +106,4 @@ RC CharType::to_string(const Value &val, string &result) const
   result = ss.str();
   return RC::SUCCESS;
 }
+

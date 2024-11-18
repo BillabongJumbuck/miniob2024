@@ -370,6 +370,8 @@ public:
     LD,
     CD,
     IP,
+    LENGTH,
+    ROUND,
   };
 
 public:

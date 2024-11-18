@@ -33,4 +33,6 @@ public:
   int cast_cost(AttrType type) override;
 
   RC to_string(const Value &val, string &result) const override;
+
+
 };

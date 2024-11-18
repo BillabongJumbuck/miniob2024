@@ -363,7 +363,7 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
   if (rc == RC::INVALID_ARGUMENT) {
     LOG_DEBUG("divide by zero!");
     left_value.set_boolean(false);
-    // rc = RC::SUCCESS;
+    //rc = RC::SUCCESS;
   }else if (rc != RC::SUCCESS) {
     LOG_WARN("failed to get value by left child expression. rc=%s", strrc(rc));
     return rc;
@@ -496,6 +496,18 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
       Value::inner_product(left_value, right_value, value);
     }break;
 
+    case Type::LENGTH: {
+      value.set_type(AttrType::INTS);
+      Value::length(left_value, value);
+    }break;
+
+    case Type::ROUND: {
+      if(right_value.get_int() == 0) {
+        value.set_type(AttrType::INTS);
+      }else value.set_type(AttrType::FLOATS);
+      Value::round(left_value, right_value, value);
+    }break;
+
     default: {
       rc = RC::INTERNAL;
       LOG_WARN("unsupported arithmetic type. %d", arithmetic_type_);
@@ -593,7 +605,6 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
   }else {
     right_value.set_value(Value(0));
   }
-
   return calc_value(left_value, right_value, value);
 }
 

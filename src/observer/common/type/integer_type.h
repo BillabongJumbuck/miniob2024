@@ -37,4 +37,8 @@ public:
   int cast_cost(AttrType type) override;
 
   RC cast_to(const Value &val, AttrType type, Value &result) const override;
+
+  RC length(const Value &val,Value &result) const override;
+
+  RC round(const Value &left_value,const Value &right_value,Value &result) const override;
 };

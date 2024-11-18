@@ -355,7 +355,7 @@ RC ExpressionBinder::bind_arithmetic_expression(
 
   child_bound_expressions.clear();
 
-  if(arithmetic_expr->arithmetic_type() != ArithmeticExpr::Type::NEGATIVE) {
+  if(arithmetic_expr->arithmetic_type() != ArithmeticExpr::Type::NEGATIVE && arithmetic_expr->arithmetic_type() != ArithmeticExpr::Type::LENGTH) {
     rc = bind_expression(right_expr, child_bound_expressions);
     if (OB_FAIL(rc)) {
       return rc;
