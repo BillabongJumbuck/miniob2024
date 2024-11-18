@@ -605,6 +605,10 @@ expression:
     | ROUND LBRACE expression RBRACE {
         $$ = create_arithmetic_expression(ArithmeticExpr::Type::ROUND, $3, new ValueExpr(Value(0)), sql_string, &@$);
     }
+    | DATE_FORMAT LBRACE expression COMMA expression RBRACE {
+        $$ = create_arithmetic_expression(ArithmeticExpr::Type::DATE_FORMAT, $3, $5, sql_string, &@$);
+    }
+
     ;
 
 aggr_func_expr:

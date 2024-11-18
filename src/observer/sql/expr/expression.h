@@ -372,6 +372,7 @@ public:
     IP,
     LENGTH,
     ROUND,
+    DATE_FORMAT,
   };
 
 public:

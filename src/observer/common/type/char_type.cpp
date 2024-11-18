@@ -107,3 +107,100 @@ RC CharType::to_string(const Value &val, string &result) const
   return RC::SUCCESS;
 }
 
+RC CharType::date_format(const Value &left, const Value &right, Value &result) const
+{
+  std::string month_name[] ={"","January","February","March","April","May","June",
+"July","August","September","October","November","December"};
+  if (left.attr_type() != AttrType::DATES) {
+    return RC::INTERNAL;  // 返回内部错误，日期类型不正确
+  }
+  if (right.attr_type() != AttrType::CHARS) {
+    return RC::INTERNAL;  // 返回内部错误，格式类型不正确
+  }
+  int cell_date = left.get_int();
+  const char *cell_format_chars = right.data();
+
+  std::string result_date_str;
+  int year = cell_date / 10000;
+  int month = (cell_date / 100) % 100;
+  int day = cell_date % 100;
+
+  for (size_t i = 0; i < strlen(cell_format_chars); i++) {
+    // A ~ z
+    if (65 <= cell_format_chars[i] && cell_format_chars[i] <= 122) {
+      switch (cell_format_chars[i]) {
+        case 'Y': {
+          char tmp[5];
+          result_date_str += tmp;
+          break;
+        }
+        case 'y': {
+          char tmp[5];
+          if (0 <= (year % 100) && (year % 100) <= 9) {
+            result_date_str += "0";
+          }
+          result_date_str += tmp;
+          break;
+        }
+        case 'M': {
+          if (month <= 0 || month > 12) {
+            return RC::INTERNAL;
+          }
+          result_date_str += month_name[month];
+          break;
+        }
+        case 'm': {
+          char tmp[3];
+          if (0 <= month && month <= 9) {
+            result_date_str += "0";
+          }
+          result_date_str += tmp;
+          break;
+        }
+        case 'D': {
+          char tmp[3];
+          result_date_str += tmp;
+          if (11 <= day && day <= 13) {
+            result_date_str += "th";
+          } else {
+            switch (day % 10) {
+              case 1: {
+                result_date_str += "st";
+                break;
+              }
+              case 2: {
+                result_date_str += "nd";
+                break;
+              }
+              case 3: {
+                result_date_str += "rd";
+                break;
+              }
+              default: {
+                result_date_str += "th";
+                break;
+              }
+            }
+          }
+          break;
+        }
+        case 'd': {
+          char tmp[3];
+          if (0 <= day && day <= 9) {
+            result_date_str += "0";
+          }
+          result_date_str += tmp;
+          break;
+        }
+        default: {
+          result_date_str += cell_format_chars[i];
+          break;
+        }
+      }
+    } else if (cell_format_chars[i] != '%') {
+      result_date_str += cell_format_chars[i];
+    }
+  }
+  result.set_string(result_date_str.c_str());
+  return RC::SUCCESS;
+}

@@ -105,6 +105,10 @@ public:
   {
     return DataType::type_instance(result.attr_type())->round(left, right, result);
   }
+  static RC date_format(const Value &left, const Value &right, Value &result)
+  {
+    return DataType::type_instance(result.attr_type())->date_format(left, right, result);
+  }
 
 
   static RC cast_to(const Value &value, AttrType to_type, Value &result)

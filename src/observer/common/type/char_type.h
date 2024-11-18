@@ -34,5 +34,5 @@ public:
 
   RC to_string(const Value &val, string &result) const override;
 
-
+  RC date_format(const Value &left, const Value &right, Value &result) const override;
 };

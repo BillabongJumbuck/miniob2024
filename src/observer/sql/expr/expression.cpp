@@ -508,6 +508,11 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
       Value::round(left_value, right_value, value);
     }break;
 
+    case Type::DATE_FORMAT: {
+      value.set_type(AttrType::CHARS);
+      Value::date_format(left_value, right_value, value);
+    }break;
+
     default: {
       rc = RC::INTERNAL;
       LOG_WARN("unsupported arithmetic type. %d", arithmetic_type_);

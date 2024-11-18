@@ -86,6 +86,8 @@ public:
   virtual RC inner_product(const Value &left, const Value &right, Value &result) const { return RC::UNSUPPORTED; }
   virtual RC length(const Value &val,Value &result) const { return RC::UNSUPPORTED; }
   virtual RC round(const Value &left, const Value &right, Value &result) const { return RC::UNSUPPORTED; }
+  virtual RC date_format(const Value &left, const Value &right, Value &result) const { return RC::UNSUPPORTED; }
+
   /**
    * @brief 计算从 type 到 attr_type 的隐式转换的 cost，如果无法转换，返回 INT32_MAX
    */
