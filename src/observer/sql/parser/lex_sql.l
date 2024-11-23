@@ -134,6 +134,7 @@ INNER                                   RETURN_TOKEN(INNER);
 JOIN                                    RETURN_TOKEN(JOIN);
 IN                                      RETURN_TOKEN(IN_OP);
 EXISTS                                  RETURN_TOKEN(EXISTS_OP);
+UNIQUE                                  RETURN_TOKEN(UNIQUE);
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 "("                                     RETURN_TOKEN(LBRACE);
 ")"                                     RETURN_TOKEN(RBRACE);

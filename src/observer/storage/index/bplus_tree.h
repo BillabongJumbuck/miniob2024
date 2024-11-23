@@ -105,6 +105,16 @@ public:
     return RID::compare(rid1, rid2);
   }
 
+  /**
+   * @brief 比较两个键值，unique_tag为true时，只比较键值，不比较rid
+   * @param {unique} 仅用于重载
+   */
+  int operator()(const char *v1, const char *v2, bool unique) const
+  {
+    return attr_comparator_(v1, v2);
+  }
+
+
 private:
   AttrComparator attr_comparator_;
 };
@@ -266,6 +276,7 @@ struct InternalIndexNode : public IndexNode
 class IndexNodeHandler
 {
 public:
+  // 只声明构造函数
   IndexNodeHandler(BplusTreeMiniTransaction &mtr, const IndexFileHeader &header, Frame *frame);
   virtual ~IndexNodeHandler() = default;
 
@@ -350,6 +361,8 @@ public:
    * 如果key已经存在，会设置found的值。
    */
   int lookup(const KeyComparator &comparator, const char *key, bool *found = nullptr) const;
+
+  int lookup_unique(const KeyComparator &comparator, const char *key, bool *found = nullptr) const;
 
   RC  insert(int index, const char *key, const char *value);
   RC  remove(int index);
@@ -490,7 +503,7 @@ public:
    * @note 这里假设user_key的内存大小与attr_length 一致
    */
   RC insert_entry(const char *user_key, const RID *rid);
-
+  RC insert_entry_unique(const char *user_key, const RID *rid);
   /**
    * @brief 从IndexHandle句柄对应的索引中删除一个值为（user_key，rid）的索引项
    * @return RECORD_INVALID_KEY 指定值不存在
@@ -558,6 +571,15 @@ protected:
    * @param[out] frame 返回找到的叶子节点
    */
   RC find_leaf(BplusTreeMiniTransaction &mtr, BplusTreeOperationType op, const char *key, Frame *&frame);
+
+  /**
+   * @brief 查找叶子节点,对unique敏感
+   * @param op 当前想要执行的操作。操作类型不同会在查找的过程中加不同类型的锁
+   * @param key 查找的键值
+   * @param[out] frame 返回找到的叶子节点
+   * @param[out] exist 如果是有效指针，将会返回当前键值是否已经存在于索引中
+   */
+  RC find_leaf_unique(BplusTreeMiniTransaction &mtr, BplusTreeOperationType op, const char *key, Frame *&frame);
 
   /**
    * @brief 找到最左边的叶子节点

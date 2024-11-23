@@ -33,6 +33,8 @@ public:
   RC close();
 
   RC insert_entry(const char *record, const RID *rid) override;
+  RC insert_entry_unique(const char *record, const RID *rid) override;
+
   RC delete_entry(const char *record, const RID *rid) override;
 
   /**

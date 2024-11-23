@@ -60,6 +60,38 @@ ForwardIterator lower_bound(
   return first;
 }
 
+template <typename ForwardIterator, typename T, typename Compare>
+ForwardIterator lower_bound_unique(
+    ForwardIterator first, ForwardIterator last, const T &val, Compare comp, bool *_found = nullptr)
+{
+  bool            found = false;
+  ForwardIterator iter;
+  const auto      count      = distance(first, last);
+  auto            last_count = count;
+  while (last_count > 0) {
+    iter      = first;
+    auto step = last_count / 2;
+    advance(iter, step);
+    int result = comp(*iter, val, true);
+    if (0 == result) {
+      first = iter;
+      found = true;
+      break;
+    }
+    if (result < 0) {
+      first = ++iter;
+      last_count -= step + 1;
+    } else {
+      last_count = step;
+    }
+  }
+
+  if (_found) {
+    *_found = found;
+  }
+  return first;
+}
+
 template <typename T>
 class Comparator
 {

@@ -35,9 +35,10 @@ class IndexMeta
 public:
   IndexMeta() = default;
 
-  RC init(const char *name, const FieldMeta &field);
+  RC init(bool is_unique, const char *name, const FieldMeta &field);
 
 public:
+  const bool is_unique() const;
   const char *name() const;
   const char *field() const;
 
@@ -48,6 +49,7 @@ public:
   static RC from_json(const TableMeta &table, const Json::Value &json_value, IndexMeta &index);
 
 protected:
+  bool   unique_tag;
   string name_;   // index's name
   string field_;  // field's name
 };

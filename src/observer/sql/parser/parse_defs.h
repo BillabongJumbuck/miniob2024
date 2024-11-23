@@ -186,6 +186,7 @@ struct DropTableSqlNode
  */
 struct CreateIndexSqlNode
 {
+  bool        unique_tag;      ///< unique tag
   std::string index_name;      ///< Index name
   std::string relation_name;   ///< Relation name
   std::string attribute_name;  ///< Attribute name

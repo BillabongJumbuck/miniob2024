@@ -228,6 +228,14 @@ RC Table::insert_record(Record &record)
   }
 
   rc = insert_entry_of_indexes(record.data(), record.rid());
+
+  // 处理UNIQUE
+  if(rc == RC::RECORD_DUPLICATE_KEY) {
+    LOG_INFO("duplicate in unique index");
+    record_handler_->delete_record(&record.rid());
+    return rc;
+  }
+
   if (rc != RC::SUCCESS) {  // 可能出现了键值重复
     RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), false /*error_on_not_exists*/);
     if (rc2 != RC::SUCCESS) {
@@ -403,7 +411,7 @@ RC Table::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode m
   return rc;
 }
 
-RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name)
+RC Table::create_index(bool unique,Trx *trx, const FieldMeta *field_meta, const char *index_name)
 {
   if (common::is_blank(index_name) || nullptr == field_meta) {
     LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name());
@@ -412,7 +420,7 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
 
   IndexMeta new_index_meta;
 
-  RC rc = new_index_meta.init(index_name, *field_meta);
+  RC rc = new_index_meta.init(unique, index_name, *field_meta);
   if (rc != RC::SUCCESS) {
     LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s", 
              name(), index_name, field_meta->name());
@@ -441,7 +449,11 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
 
   Record record;
   while (OB_SUCC(rc = scanner.next(record))) {
-    rc = index->insert_entry(record.data(), &record.rid());
+    if(unique) {
+      rc = index->insert_entry_unique(record.data(), &record.rid());
+    }else {
+      rc = index->insert_entry(record.data(), &record.rid());
+    }
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to insert record into index while creating index. table=%s, index=%s, rc=%s",
                name(), index_name, strrc(rc));
@@ -544,15 +556,17 @@ RC Table::update_record(const Record &record, const Value& value, const FieldMet
   memcpy(new_record.data() + field_meta->offset(), src, copy_len);
 
   RC rc = RC::SUCCESS;
-  rc = delete_record(record);
+
+  rc = insert_record(new_record);
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to delete old record when update! table=%s, field=%s, value=%s",
+    LOG_INFO("Failed to insert new record when update! table=%s, field=%s, value=%s",
       this->name(), field_meta->name(), value.data());
     return rc;
   }
-  rc = insert_record(new_record);
+
+  rc = delete_record(record);
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to insert new record when update! table=%s, field=%s, value=%s",
+    LOG_ERROR("Failed to delete old record when update! table=%s, field=%s, value=%s",
       this->name(), field_meta->name(), value.data());
     return rc;
   }
@@ -565,7 +579,11 @@ RC Table::insert_entry_of_indexes(const char *record, const RID &rid)
 {
   RC rc = RC::SUCCESS;
   for (Index *index : indexes_) {
-    rc = index->insert_entry(record, &rid);
+    if(index ->index_meta().is_unique()) {
+      rc = index->insert_entry_unique(record, &rid);
+    }else {
+      rc = index->insert_entry(record, &rid);
+    }
     if (rc != RC::SUCCESS) {
       break;
     }

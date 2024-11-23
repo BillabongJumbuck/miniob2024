@@ -234,6 +234,15 @@ int LeafIndexNodeHandler::lookup(const KeyComparator &comparator, const char *ke
   return iter - iter_begin;
 }
 
+int LeafIndexNodeHandler::lookup_unique(const KeyComparator &comparator, const char *key, bool *found) const{
+  const int                    size = this->size();
+  common::BinaryIterator<char> iter_begin(item_size(), __key_at(0));
+  common::BinaryIterator<char> iter_end(item_size(), __key_at(size));
+  common::BinaryIterator<char> iter = lower_bound_unique(iter_begin, iter_end, key, comparator, found);
+  return iter - iter_begin;
+}
+
+
 RC LeafIndexNodeHandler::insert(int index, const char *key, const char *value)
 {
   vector<char> item(key_size() + value_size());
@@ -1204,6 +1213,58 @@ RC BplusTreeHandler::find_leaf(BplusTreeMiniTransaction &mtr, BplusTreeOperation
   return find_leaf_internal(mtr, op, child_page_getter, frame);
 }
 
+RC BplusTreeHandler::find_leaf_unique(BplusTreeMiniTransaction &mtr, BplusTreeOperationType op, const char *key, Frame *&frame)
+{
+  // 先获取根节点
+  Frame *current_frame = nullptr;
+  RC rc = mtr.latch_memo().get_page(file_header_.root_page, current_frame);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to get root page. page id=%d, rc=%d:%s", file_header_.root_page, rc, strrc(rc));
+    return rc;
+  }
+
+  rc = crabing_protocal_fetch_page(mtr, op, file_header_.root_page, true /*is_root_page*/, current_frame);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to latch root page. page id=%d, rc=%d:%s", file_header_.root_page, rc, strrc(rc));
+    return rc;
+  }
+
+  bool is_root_page = true;
+
+  while (true) {
+    IndexNodeHandler current_node(mtr, file_header_, current_frame);
+    if (current_node.is_leaf()) {
+      // 到达叶子节点，检查重复
+      LeafIndexNodeHandler leaf_node(mtr, file_header_, current_frame);
+      bool exists = false;
+      leaf_node.lookup_unique(key_comparator_, key, &exists);
+      if (exists) {
+        return RC::RECORD_DUPLICATE_KEY;
+      }
+      break;
+    }
+
+    // 非叶子节点的情况
+    InternalIndexNodeHandler internal_node(mtr, file_header_, current_frame);
+    bool exists = false;
+    int index = internal_node.lookup(key_comparator_, key, &exists);
+    if (exists) {
+      return RC::RECORD_DUPLICATE_KEY;
+    }
+    PageNum child_page_num = internal_node.value_at(index);
+
+    is_root_page = false;
+    rc = crabing_protocal_fetch_page(mtr, op, child_page_num, is_root_page, current_frame);
+    if (OB_FAIL(rc)) {
+      LOG_WARN("failed to latch child page. page id=%d, rc=%d:%s", child_page_num, rc, strrc(rc));
+      return rc;
+    }
+  }
+
+  frame = current_frame;
+  return RC::SUCCESS;
+}
+
 RC BplusTreeHandler::left_most_page(BplusTreeMiniTransaction &mtr, Frame *&frame)
 {
   auto child_page_getter = [](InternalIndexNodeHandler &internal_node) { return internal_node.value_at(0); };
@@ -1553,6 +1614,53 @@ RC BplusTreeHandler::insert_entry(const char *user_key, const RID *rid)
   LOG_TRACE("insert entry success");
   return RC::SUCCESS;
 }
+
+RC BplusTreeHandler::insert_entry_unique(const char *user_key, const RID *rid){
+  if (user_key == nullptr || rid == nullptr) {
+    LOG_WARN("Invalid arguments, key is empty or rid is empty");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  MemPoolItem::item_unique_ptr pkey = make_key(user_key, *rid);
+  if (pkey == nullptr) {
+    LOG_WARN("Failed to alloc memory for key.");
+    return RC::NOMEM;
+  }
+
+  RC rc = RC::SUCCESS;
+
+  BplusTreeMiniTransaction mtr(*this, &rc);
+
+  char *key = static_cast<char *>(pkey.get());
+
+  if (is_empty()) {
+    root_lock_.lock();
+    if (is_empty()) {
+      rc = create_new_tree(mtr, key, rid);
+      root_lock_.unlock();
+      return rc;
+    }
+    root_lock_.unlock();
+  }
+
+  Frame *frame = nullptr;
+
+  rc = find_leaf_unique(mtr, BplusTreeOperationType::INSERT, key, frame);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("Failed to find leaf %s. rc=%d:%s", rid->to_string().c_str(), rc, strrc(rc));
+    return rc;
+  }
+
+  rc = insert_entry_into_leaf_node(mtr, frame, key, rid);
+  if (OB_FAIL(rc)) {
+    LOG_TRACE("Failed to insert into leaf of index, rid:%s. rc=%s", rid->to_string().c_str(), strrc(rc));
+    return rc;
+  }
+
+  LOG_TRACE("insert entry success");
+  return RC::SUCCESS;
+}
+
 
 RC BplusTreeHandler::get_entry(const char *user_key, int key_len, list<RID> &rids)
 {
