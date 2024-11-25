@@ -29,7 +29,7 @@ class FieldMeta;
 class CreateIndexStmt : public Stmt
 {
 public:
-  CreateIndexStmt(bool unique_tag,Table *table, const FieldMeta *field_meta, const std::string &index_name)
+  CreateIndexStmt(bool unique_tag,Table *table, std::vector<const FieldMeta*> field_meta, const std::string &index_name)
       : unique_tag_(unique_tag), table_(table), field_meta_(field_meta), index_name_(index_name)
   {}
 
@@ -39,7 +39,7 @@ public:
 
   bool unique_tag() const { return unique_tag_; }
   Table             *table() const { return table_; }
-  const FieldMeta   *field_meta() const { return field_meta_; }
+  const std::vector<const FieldMeta*> field_meta() const { return field_meta_; }
   const std::string &index_name() const { return index_name_; }
 
 public:
@@ -48,6 +48,6 @@ public:
 private:
   bool             unique_tag_ = false;
   Table           *table_      = nullptr;
-  const FieldMeta *field_meta_ = nullptr;
+  std::vector<const FieldMeta*> field_meta_;
   std::string      index_name_;
 };

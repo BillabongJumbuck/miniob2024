@@ -22,7 +22,7 @@ const static Json::StaticString UNIQUE_TAG("unique");
 const static Json::StaticString FIELD_NAME("name");
 const static Json::StaticString FIELD_FIELD_NAME("field_name");
 
-RC IndexMeta::init(bool is_unique, const char *name, const FieldMeta &field)
+RC IndexMeta::init(bool is_unique, const char *name, const std::vector<const FieldMeta*> &fields)
 {
   if (common::is_blank(name)) {
     LOG_ERROR("Failed to init index, name is empty.");
@@ -31,7 +31,9 @@ RC IndexMeta::init(bool is_unique, const char *name, const FieldMeta &field)
 
   unique_tag = is_unique;
   name_  = name;
-  field_ = field.name();
+  for (const FieldMeta *field : fields) {
+    field_.emplace_back(field->name());
+  }
   return RC::SUCCESS;
 }
 
@@ -39,7 +41,12 @@ void IndexMeta::to_json(Json::Value &json_value) const
 {
   json_value[UNIQUE_TAG]       = unique_tag;
   json_value[FIELD_NAME]       = name_;
-  json_value[FIELD_FIELD_NAME] = field_;
+
+  Json::Value fields;
+  for (int i = 0; i < field_.size(); i++) {
+    fields[i] = field_[i];
+  }
+  json_value[FIELD_FIELD_NAME] = std::move(fields);
 }
 
 RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, IndexMeta &index)
@@ -47,6 +54,7 @@ RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, I
   const Json::Value &unique_value = json_value[UNIQUE_TAG];
   const Json::Value &name_value  = json_value[FIELD_NAME];
   const Json::Value &field_value = json_value[FIELD_FIELD_NAME];
+
   if (!unique_value.isBool()) {
     LOG_ERROR("Unique tag of index [%s] is not a boolean. json value=%s",
         name_value.asCString(), unique_value.toStyledString().c_str());
@@ -57,25 +65,23 @@ RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, I
     return RC::INTERNAL;
   }
 
-  if (!field_value.isString()) {
-    LOG_ERROR("Field name of index [%s] is not a string. json value=%s",
-        name_value.asCString(), field_value.toStyledString().c_str());
-    return RC::INTERNAL;
+  std::vector<const FieldMeta*> fields;
+  for (int i = 0; i < field_value.size(); i++) {
+    const FieldMeta *field = table.field(field_value[i].asCString());
+    if (nullptr == field) {
+      LOG_ERROR("Deserialize index [%s]: no such field: %s", name_value.asCString(), field_value.asCString());
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    fields.emplace_back(field);
   }
 
-  const FieldMeta *field = table.field(field_value.asCString());
-  if (nullptr == field) {
-    LOG_ERROR("Deserialize index [%s]: no such field: %s", name_value.asCString(), field_value.asCString());
-    return RC::SCHEMA_FIELD_MISSING;
-  }
-
-  return index.init(unique_value.asBool(),name_value.asCString(), *field);
+  return index.init(unique_value.asBool(),name_value.asCString(), fields);
 }
 
 const bool IndexMeta::is_unique() const { return unique_tag; }
 
 const char *IndexMeta::name() const { return name_.c_str(); }
 
-const char *IndexMeta::field() const { return field_.c_str(); }
+const std::vector<std::string> &IndexMeta::field() const { return field_; }
 
-void IndexMeta::desc(ostream &os) const { os << "index name=" << name_ << ", field=" << field_; }
+// void IndexMeta::desc(ostream &os) const { os << "index name=" << name_ << ", field=" << field_; }
