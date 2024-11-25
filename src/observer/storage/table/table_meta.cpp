@@ -157,7 +157,7 @@ const IndexMeta *TableMeta::index(const char *name) const
 const IndexMeta *TableMeta::find_index_by_field(const char *field) const
 {
   for (const IndexMeta &index : indexes_) {
-    if (0 == strcmp(index.field(), field)) {
+    if (0 == strcmp(index.field()[0].c_str(), field)) {
       return &index;
     }
   }
@@ -305,19 +305,19 @@ int TableMeta::get_serial_size() const { return -1; }
 
 void TableMeta::to_string(std::string &output) const {}
 
-void TableMeta::desc(std::ostream &os) const
-{
-  os << name_ << '(' << std::endl;
-  for (const auto &field : fields_) {
-    os << '\t';
-    field.desc(os);
-    os << std::endl;
-  }
-
-  for (const auto &index : indexes_) {
-    os << '\t';
-    index.desc(os);
-    os << std::endl;
-  }
-  os << ')' << std::endl;
-}
+// void TableMeta::desc(std::ostream &os) const
+// {
+//   os << name_ << '(' << std::endl;
+//   for (const auto &field : fields_) {
+//     os << '\t';
+//     field.desc(os);
+//     os << std::endl;
+//   }
+//
+//   for (const auto &index : indexes_) {
+//     os << '\t';
+//     index.desc(os);
+//     os << std::endl;
+//   }
+//   os << ')' << std::endl;
+// }

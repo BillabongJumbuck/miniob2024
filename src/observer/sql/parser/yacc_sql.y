@@ -297,17 +297,21 @@ desc_table_stmt:
     ;
 
 create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE unique_tag INDEX ID ON ID LBRACE ID RBRACE
+    CREATE unique_tag INDEX ID ON ID LBRACE rel_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
       create_index.unique_tag = $2;
       create_index.index_name = $4;
       create_index.relation_name = $6;
-      create_index.attribute_name = $8;
+
+      if ($8 != nullptr) {
+        create_index.attribute_name.swap(*$8);
+        delete $8;
+      }
+
       free($4);
       free($6);
-      free($8);
     }
     ;
 

@@ -76,10 +76,25 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     }
   }
 
+  Value value;
   // 检查类型是否一致
   if(update.value -> type() == ExprType::VALUE) {
-    Value value = dynamic_cast<ValueExpr *>(update.value)->get_value();
+    value = dynamic_cast<ValueExpr *>(update.value)->get_value();
+    // patch:转换日期类型
+    if(field_meta->type() == AttrType::DATES) {
+      // 从 'yyyy-mm-dd' 找出 y, m ,d 三个变量
+      const char* temp = value.data();
+      int y, m ,d;
+      // 提取年份
+      y = (temp[0] - '0') * 1000 + (temp[1] - '0') * 100 + (temp[2] - '0') * 10 + (temp[3] - '0');
 
+      // 提取月份
+      m = (temp[5] - '0') * 10 + (temp[6] - '0');
+
+      // 提取日期
+      d = (temp[8] - '0') * 10 + (temp[9] - '0');
+      value.set_date(y,m,d);
+    }
     if( !value.is_null() &&  value.attr_type() != field_meta->type()) {
       LOG_WARN("invalid argument. db=%p, attr_name=%p", db, attr_name);
       return RC::INVALID_ARGUMENT;
@@ -116,6 +131,9 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     }
   }
 
-  stmt = new UpdateStmt(table, field_meta, update.value, filter_stmt);
+  if(update.value -> type() == ExprType::SUBQUERY)
+    stmt = new UpdateStmt(table, field_meta, update.value, filter_stmt);
+  else if(update.value -> type() == ExprType::VALUE)
+    stmt = new UpdateStmt(table, field_meta, new ValueExpr(value), filter_stmt);
   return RC::SUCCESS;
 }
