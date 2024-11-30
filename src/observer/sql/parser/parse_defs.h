@@ -139,8 +139,8 @@ struct DeleteSqlNode
 struct UpdateSqlNode
 {
   std::string                   relation_name;   ///< Relation to update
-  std::string                   attribute_name;  ///< 更新的字段，仅支持一个字段
-  Expression*                   value;           ///< 更新的值，仅支持一个字段
+  std::vector<std::string>      attribute_names;       ///< 更新的字段，支持多个字段
+  std::vector<Expression*>      values;                ///< 更新的值，支持多个字段
   Expression*                   conditions = nullptr;  ///< 查询条件，使用AND串联起来多个条件
 };
 
@@ -149,6 +149,11 @@ struct UpdateSqlNode
  * @ingroup SQLParser
  * @details 属性，或者说字段(column, field)
  */
+struct UpdateItem
+{
+  std::string attr_name;
+  Expression* value = nullptr;
+};
 struct AttrInfoSqlNode
 {
   AttrType    type;    ///< Type of attribute

@@ -138,6 +138,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<AttrInfoSqlNode> *             attr_infos;
   AttrInfoSqlNode *                          attr_info;
   Expression *                               expression;
+  UpdateItem *                               update_item_ptr;
+  std::vector<UpdateItem>*                   update_item_list_ptr;
   std::vector<std::unique_ptr<Expression>> * expression_list;
   std::vector<Value> *                       value_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
@@ -178,6 +180,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <value_list>          value_list_ssq
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
+%type <update_item_ptr>     update_item;
+%type <update_item_list_ptr> update_item_list;
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
@@ -507,17 +511,47 @@ delete_stmt:    /*  delete 语句的语法解析树*/
     }
     ;
 update_stmt:      /*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ expression where
+    UPDATE ID SET update_item_list where
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
       $$->update.relation_name = $2;
-      $$->update.attribute_name = $4;
-      $$->update.value = $6;
-      if ($7 != nullptr) {
-        $$->update.conditions = $7;
+      for(auto &item: *$4) {
+        $$->update.attribute_names.push_back(item.attr_name);
+        $$->update.values.push_back(item.value);
+      }
+      std::reverse($$->update.attribute_names.begin(), $$->update.attribute_names.end());
+      std::reverse($$->update.values.begin(), $$->update.values.end());
+      if ($5 != nullptr) {
+        $$->update.conditions = $5;
       }
       free($2);
-      free($4);
+    }
+    ;
+update_item_list:
+    update_item
+    {
+        $$ = new std::vector<UpdateItem>;
+        $$->emplace_back(*$1);
+        delete $1;
+    }
+    | update_item COMMA update_item_list
+    {
+        if ($3 != nullptr) {
+            $$ = $3;
+        } else {
+            $$ = new std::vector<UpdateItem>;
+        }
+        $$->emplace_back(*$1);
+        delete $1;
+    }
+    ;
+
+update_item:
+    ID EQ expression
+    {
+      $$ = new UpdateItem;
+      $$->attr_name = $1;
+      $$->value = $3;
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
