@@ -59,12 +59,13 @@ enum class BplusTreeOperationType
 class AttrComparator
 {
 public:
-  void init(int attr_num, int *field_id, AttrType *type, int *length)
+  void init(int attr_num, int *field_id, AttrType *type, int *length, int *offset)
   {
     for (int i = 0; i < attr_num; i++) {
       field_id_.emplace_back(field_id[i]);
       attr_type_.emplace_back(type[i]);
       attr_length_.emplace_back(length[i]);
+      attr_offset_.emplace_back(offset[i]);
     }
   }
 
@@ -79,43 +80,17 @@ public:
   {
     int cmp_res = 0;
     // TODO: optimized the comparison
-    int offset = attr_length_[0];
-    common::Bitmap l_map(const_cast<char*>(v1), attr_length_[0] * 8);
-    common::Bitmap r_map(const_cast<char*>(v2), attr_length_[0] * 8);
-    for (size_t i = 1; i < attr_type_.size(); i++) {
-      if (l_map.get_bit(field_id_[i]) == true || r_map.get_bit(field_id_[i]) == true) {
-        return -1;
-      }
-      switch (attr_type_[i]) {
-        case AttrType::INTS:
-        case AttrType::DATES: {
-          if (0 == (cmp_res = common::compare_int((void *)(v1 + offset), (void *)(v2 + offset)))) {
-            offset += attr_length_[i];
-          } else {
-            return cmp_res;
-          }
-          break;
-        }
-        case AttrType::FLOATS: {
-          if (0 == (cmp_res = common::compare_float((void *)(v1 + offset), (void *)(v2 + offset)))) {
-            offset += attr_length_[i];
-          } else {
-            return cmp_res;
-          }
-          break;
-        }
-        case AttrType::CHARS: {
-          if (0 == (cmp_res = common::compare_string((void *)(v1 + offset), attr_length_[i], (void *)(v2 + offset), attr_length_[i]))) {
-            offset += attr_length_[i];
-          } else {
-            return cmp_res;
-          }
-          break;
-        }
-        default: {
-          LOG_INFO("Unknown type %d", attr_type_[i]);
-          return 0;
-        }
+
+    for(size_t i = 0; i < attr_type_.size(); i++) {
+      Value left;
+      left.set_type(attr_type_[i]);
+      left.set_data(v1 + attr_offset_[i], attr_length_[i]);
+      Value right;
+      right.set_type(attr_type_[i]);
+      right.set_data(v2 + attr_offset_[i], attr_length_[i]);
+      cmp_res = DataType::type_instance(attr_type_[i])->compare(left, right);
+      if (cmp_res != 0) {
+        return cmp_res;
       }
     }
     return cmp_res;
@@ -125,6 +100,7 @@ private:
   std::vector<int> field_id_;
   std::vector<int> attr_length_;
   std::vector<AttrType> attr_type_;
+  std::vector<int> attr_offset_;
 };
 
 /**
@@ -135,11 +111,11 @@ private:
 class KeyComparator
 {
 public:
-  void init(AttrType type, int length) { attr_comparator_.init(true, nullptr ,&type, &length); }
+  void init(AttrType type, int length) { attr_comparator_.init(true, nullptr ,&type, &length, nullptr); }
 
-  void init(bool unique, int attr_num, int *field_id, AttrType *type, int *length)
+  void init(bool unique, int attr_num, int *field_id, AttrType *type, int *length, int *offset)
   {
-    attr_comparator_.init(attr_num, field_id, type, length);
+    attr_comparator_.init(attr_num, field_id, type, length, offset);
     unique_ = unique;
   }
 
@@ -150,12 +126,12 @@ public:
     int result = attr_comparator_(v1, v2);
     if (result != 0) {
       return result;
-    }else if (!unique_) {
-      /* 唯一索引不比较RID */
-      const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
-      const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
-      result = RID::compare(rid1, rid2);
     }
+
+    const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
+    const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
+    result = RID::compare(rid1, rid2);
+
     return result;
   }
 
@@ -165,6 +141,7 @@ public:
    */
   int operator()(const char *v1, const char *v2, bool unique) const
   {
+    // 唯一索引不比较RID
     return attr_comparator_(v1, v2);
   }
 
@@ -613,7 +590,7 @@ public:
    */
   RC insert_entry(const char *record, const RID *rid);
 
-  RC insert_entry_unique(const char *user_key, const RID *rid);
+  RC insert_entry_unique(const char *record, const RID *rid);
   /**
    * @brief 从IndexHandle句柄对应的索引中删除一个值为（user_key，rid）的索引项
    * @return RECORD_INVALID_KEY 指定值不存在
@@ -770,7 +747,7 @@ protected:
   RC adjust_root(BplusTreeMiniTransaction &mtr, Frame *root_frame);
 
 private:
-  common::MemPoolItem::item_unique_ptr make_key(const char *user_key, const RID &rid);
+  common::MemPoolItem::item_unique_ptr make_key(const char *record, const RID &rid);
 
 protected:
   LogHandler     *log_handler_      = nullptr;  /// 日志处理器

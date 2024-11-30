@@ -188,32 +188,39 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
     return rc;
   }
 
-  // const int index_num = table_meta_.index_num();
-  // for (int i = 0; i < index_num; i++) {
-  //   const IndexMeta *index_meta = table_meta_.index(i);
-  //   const FieldMeta *field_meta = table_meta_.field(index_meta->field()[0].c_str());
-  //   if (field_meta == nullptr) {
-  //     LOG_ERROR("Found invalid index meta info which has a non-exists field. table=%s, index=%s, field=%s",
-  //               name(), index_meta->name(), index_meta->field());
-  //     // skip cleanup
-  //     //  do all cleanup action in destructive Table function
-  //     return RC::INTERNAL;
-  //   }
-  //
-  //   BplusTreeIndex *index      = new BplusTreeIndex();
-  //   string          index_file = table_index_file(base_dir, name(), index_meta->name());
-  //
-  //   rc = index->open(this, index_file.c_str(), *index_meta, *field_meta);
-  //   if (rc != RC::SUCCESS) {
-  //     delete index;
-  //     LOG_ERROR("Failed to open index. table=%s, index=%s, file=%s, rc=%s",
-  //               name(), index_meta->name(), index_file.c_str(), strrc(rc));
-  //     // skip cleanup
-  //     //  do all cleanup action in destructive Table function.
-  //     return rc;
-  //   }
-  //   indexes_.push_back(index);
-  // }
+  const int index_num = table_meta_.index_num();
+  for (int i = 0; i < index_num; i++) {
+    const IndexMeta *index_meta = table_meta_.index(i);
+    std::vector<const FieldMeta *> field_metas;
+    const std::vector<std::string> &field_names = index_meta->field();
+    for (int j = 0; j < field_names.size(); j++) {
+      const FieldMeta *field_meta = table_meta_.field(field_names[j].c_str());
+      if (field_meta == nullptr) {
+        LOG_ERROR("Found invalid index meta info which has a non-exists field. table=%s, index=%s, field=%s",
+            name(),
+            index_meta->name(),
+            index_meta->field().data());
+        // skip cleanup
+        //  do all cleanup action in destructive Table function
+        return RC::INTERNAL;
+      }
+      field_metas.emplace_back(field_meta);
+    }
+
+    BplusTreeIndex *index      = new BplusTreeIndex();
+    string          index_file = table_index_file(base_dir, name(), index_meta->name());
+
+    rc                         = index->open(this, index_file.c_str(), *index_meta, field_metas);
+    if (rc != RC::SUCCESS) {
+      delete index;
+      LOG_ERROR("Failed to open index. table=%s, index=%s, file=%s, rc=%s",
+                name(), index_meta->name(), index_file.c_str(), strrc(rc));
+      // skip cleanup
+      //  do all cleanup action in destructive Table function.
+      return rc;
+    }
+    indexes_.push_back(index);
+  }
 
   return rc;
 }

@@ -905,7 +905,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
     return RC::NOMEM;
   }
 
-  key_comparator_.init(file_header->unique, file_header->attr_num, file_header->field_id, file_header->attr_type, file_header->attr_length);
+  key_comparator_.init(file_header->unique, file_header->attr_num, file_header->field_id, file_header->attr_type, file_header->attr_length, file_header->attr_offset);
   key_printer_.init(file_header->attr_num, file_header->attr_type, file_header->attr_length);
 
   /*
@@ -977,7 +977,7 @@ RC BplusTreeHandler::open(LogHandler &log_handler, DiskBufferPool &buffer_pool)
   // close old page_handle
   buffer_pool.unpin_page(frame);
 
-  key_comparator_.init(file_header_.unique, file_header_.attr_num, file_header_.field_id, file_header_.attr_type, file_header_.attr_length);
+  key_comparator_.init(file_header_.unique, file_header_.attr_num, file_header_.field_id, file_header_.attr_type, file_header_.attr_length, file_header_.attr_offset);
   key_printer_.init(file_header_.attr_num, file_header_.attr_type, file_header_.attr_length);
 
 
@@ -1520,7 +1520,7 @@ RC BplusTreeHandler::recover_init_header_page(BplusTreeMiniTransaction &mtr, Fra
   header_dirty_ = false;
   frame->mark_dirty();
 
-  key_comparator_.init(file_header_.unique, file_header_.attr_num, file_header_.field_id, file_header_.attr_type, file_header_.attr_length);
+  key_comparator_.init(file_header_.unique, file_header_.attr_num, file_header_.field_id, file_header_.attr_type, file_header_.attr_length, file_header_.attr_offset);
   key_printer_.init(file_header_.attr_num, file_header_.attr_type, file_header_.attr_length);
 
   return RC::SUCCESS;
@@ -1567,18 +1567,17 @@ RC BplusTreeHandler::create_new_tree(BplusTreeMiniTransaction &mtr, const char *
   return rc;
 }
 
-MemPoolItem::item_unique_ptr BplusTreeHandler::make_key(const char *user_key, const RID &rid)
+MemPoolItem::item_unique_ptr BplusTreeHandler::make_key(const char *record, const RID &rid)
 {
   MemPoolItem::item_unique_ptr key = mem_pool_item_->alloc_unique_ptr();
   if (key == nullptr) {
     LOG_WARN("Failed to alloc memory for key.");
     return nullptr;
   }
-  // 先把bitmap复制进去，然后复制索引列
-  int offset = file_header_.attr_length[0];
-  memcpy(static_cast<char *>(key.get()), user_key, file_header_.attr_length[0]);
-  for (int i = 1; i < file_header_.attr_num; i++) {
-    memcpy(static_cast<char *>(key.get()) + offset, user_key + file_header_.attr_offset[i], file_header_.attr_length[i]);
+
+  int offset = 0;
+  for(int i = 0; i < file_header_.attr_num; i++) {
+    memcpy(static_cast<char *>(key.get()) + file_header_.attr_offset[i], record + file_header_.attr_offset[i], file_header_.attr_length[i]);
     offset += file_header_.attr_length[i];
   }
   memcpy(static_cast<char *>(key.get()) + offset, &rid, sizeof(rid));
@@ -1634,13 +1633,13 @@ RC BplusTreeHandler::insert_entry(const char *record, const RID *rid)
   return RC::SUCCESS;
 }
 
-RC BplusTreeHandler::insert_entry_unique(const char *user_key, const RID *rid){
-  if (user_key == nullptr || rid == nullptr) {
+RC BplusTreeHandler::insert_entry_unique(const char *record, const RID *rid){
+  if (record == nullptr || rid == nullptr) {
     LOG_WARN("Invalid arguments, key is empty or rid is empty");
     return RC::INVALID_ARGUMENT;
   }
 
-  MemPoolItem::item_unique_ptr pkey = make_key(user_key, *rid);
+  MemPoolItem::item_unique_ptr pkey = make_key(record, *rid);
   if (pkey == nullptr) {
     LOG_WARN("Failed to alloc memory for key.");
     return RC::NOMEM;
