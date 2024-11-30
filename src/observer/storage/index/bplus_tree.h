@@ -271,7 +271,6 @@ struct IndexFileHeader
   int32_t key_length;         ///< attr length + sizeof(RID)
   int32_t unique;            ///< 是否是唯一索引
   int32_t attr_num;           ///< 索引列数量
-  int32_t field_id[MAX_INDEX_FIELD_NUM];
   int32_t attr_length[MAX_INDEX_FIELD_NUM];       ///< 键值的长度
   int32_t attr_offset[MAX_INDEX_FIELD_NUM];       ///< 键值在record中的offset
   AttrType attr_type[MAX_INDEX_FIELD_NUM];        ///< 键值的类型
@@ -558,9 +557,9 @@ public:
    * @param internal_max_size 内部节点最大大小
    * @param leaf_max_size 叶子节点最大大小
    */
-  RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name, bool unique, const std::vector<int> &field_ids, const std::vector<const FieldMeta*> &fields,
+  RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name, bool unique, const std::vector<const FieldMeta*> &fields,
       int internal_max_size = -1, int leaf_max_size = -1);
-  RC create(LogHandler &log_handler, DiskBufferPool &buffer_pool, bool unique, const std::vector<int> &field_ids, const std::vector<const FieldMeta*> &fields,
+  RC create(LogHandler &log_handler, DiskBufferPool &buffer_pool, bool unique,  const std::vector<const FieldMeta*> &fields,
       int internal_max_size = -1, int leaf_max_size = -1);
 
   /**

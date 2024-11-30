@@ -27,7 +27,7 @@ public:
   BplusTreeIndex() = default;
   virtual ~BplusTreeIndex() noexcept;
 
-  RC create(Table *table, const char *file_name, bool unique ,const IndexMeta &index_meta, const std::vector<int> &field_ids, const std::vector<const FieldMeta*> &field_metas);
+  RC create(Table *table, const char *file_name, bool unique ,const IndexMeta &index_meta, const std::vector<const FieldMeta*> &field_metas);
   RC drop_index(BufferPoolManager &bpm, const char *file_name) override;
   RC open(Table *table, const char *file_name, const IndexMeta &index_meta, const std::vector<const FieldMeta*> &field_metas);
   RC close();

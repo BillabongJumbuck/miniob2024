@@ -193,7 +193,7 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
     const IndexMeta *index_meta = table_meta_.index(i);
     std::vector<const FieldMeta *> field_metas;
     const std::vector<std::string> &field_names = index_meta->field();
-    for (int j = 0; j < field_names.size(); j++) {
+    for (size_t j = 0; j < field_names.size(); j++) {
       const FieldMeta *field_meta = table_meta_.field(field_names[j].c_str());
       if (field_meta == nullptr) {
         LOG_ERROR("Found invalid index meta info which has a non-exists field. table=%s, index=%s, field=%s",
@@ -434,24 +434,11 @@ RC Table::create_index(bool unique,Trx *trx, std::vector<const FieldMeta*> field
     return rc;
   }
 
-  std::vector<int> field_ids;
-  for (size_t i = 0; i < field_meta.size(); i++) {
-    const FieldMeta *temp = field_meta[i];
-    int field_id = 0;
-    for (const FieldMeta& field : *table_meta_.field_metas()) {
-      if (0 == strcmp(field.name(), temp->name())) {
-        field_ids.emplace_back(field_id);
-        break;
-      }
-      field_id++;
-    }
-  }
-
   // 创建索引相关数据
   BplusTreeIndex *index      = new BplusTreeIndex();
   string          index_file = table_index_file(base_dir_.c_str(), name(), index_name);
 
-  rc = index->create(this, index_file.c_str(), unique, new_index_meta, field_ids, field_meta);
+  rc = index->create(this, index_file.c_str(), unique, new_index_meta, field_meta);
   if (rc != RC::SUCCESS) {
     delete index;
     LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
@@ -596,7 +583,7 @@ RC Table::update_record(const Record &record, const Value& value, const FieldMet
 RC Table::update_record(const Record &record, std::vector<Value> &values, std::vector<const FieldMeta *> &field_meta){
   Record new_record = record;
 
-  for(int i = 0; i < values.size(); i++){
+  for(size_t i = 0; i < values.size(); i++){
     size_t       copy_len = field_meta[i]->len();
     const size_t data_len = values[i].length();
 

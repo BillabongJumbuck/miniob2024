@@ -806,7 +806,7 @@ RC BplusTreeHandler::sync()
 RC BplusTreeHandler::create(LogHandler &log_handler,
                             BufferPoolManager &bpm,
                             const char *file_name, 
-                            bool unique, const std::vector<int> &field_ids, const std::vector<const FieldMeta*> &fields,
+                            bool unique, const std::vector<const FieldMeta*> &fields,
                             int internal_max_size /* = -1*/,
                             int leaf_max_size /* = -1 */)
 {
@@ -826,7 +826,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
   }
   LOG_INFO("Successfully open index file %s.", file_name);
 
-  rc = this->create(log_handler, *bp, unique, field_ids, fields, internal_max_size, leaf_max_size);
+  rc = this->create(log_handler, *bp, unique, fields, internal_max_size, leaf_max_size);
   if (OB_FAIL(rc)) {
     bpm.close_file(file_name);
     return rc;
@@ -838,7 +838,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
 
 RC BplusTreeHandler::create(LogHandler &log_handler,
             DiskBufferPool &buffer_pool,
-            bool unique, const std::vector<int> &field_ids, const std::vector<const FieldMeta*> &fields,
+            bool unique, const std::vector<const FieldMeta*> &fields,
             int internal_max_size /* = -1 */,
             int leaf_max_size /* = -1 */)
 {
@@ -883,8 +883,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
   file_header->root_page = BP_INVALID_PAGE_NUM;
   file_header->unique = unique;
   file_header->attr_num = fields.size();
-  for (int i = 0; i < fields.size(); i++) {
-    file_header->field_id[i] = field_ids[i];
+  for (size_t i = 0; i < fields.size(); i++) {
     file_header->attr_type[i] = fields[i]->type();
     file_header->attr_offset[i] = fields[i]->offset();
     file_header->attr_length[i] = fields[i]->len();
