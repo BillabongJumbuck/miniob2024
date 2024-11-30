@@ -4,10 +4,12 @@
 
 #include "sql/operator/update_logical_operator.h"
 
- UpdateLogicalOperator::UpdateLogicalOperator(Table *table, const FieldMeta *field_meta, Expression* value)
- {
-   table_ = table;
-   field_meta_ = field_meta;
-   value_ = value;
- }
+UpdateLogicalOperator::UpdateLogicalOperator(
+    Table *table, std::vector<const FieldMeta *> &field_metas, std::vector<Expression *> &values)
+{
+  table_ = table;
+  field_metas_ = field_metas;
+  values_ = values;
+}
+
 

@@ -593,6 +593,42 @@ RC Table::update_record(const Record &record, const Value& value, const FieldMet
 
   return rc;
 }
+RC Table::update_record(const Record &record, std::vector<Value> &values, std::vector<const FieldMeta *> &field_meta){
+  Record new_record = record;
+
+  for(int i = 0; i < values.size(); i++){
+    size_t       copy_len = field_meta[i]->len();
+    const size_t data_len = values[i].length();
+
+    const char *src = values[i].data();
+    if(values[i].is_null()) {
+      src = Value::to_null_storage();
+      copy_len = strlen(src) + 1;
+    }else if (field_meta[i]->type() == AttrType::CHARS) {
+      if (copy_len > data_len) {
+        copy_len = data_len + 1;
+      }
+    }
+    memcpy(new_record.data() + field_meta[i]->offset(), src, copy_len);
+  }
+  RC rc = RC::SUCCESS;
+
+  rc = insert_record(new_record);
+  if (rc != RC::SUCCESS) {
+    LOG_INFO("Failed to insert new record when update! table=%s, field=%s, value=%s",
+      this->name(), field_meta[0]->name(), values[0].data());
+    return rc;
+  }
+
+  rc = delete_record(record);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to delete old record when update! table=%s, field=%s, value=%s",
+      this->name(), field_meta[0]->name(), values[0].data());
+    return rc;
+  }
+
+  return rc;
+}
 
 
 RC Table::insert_entry_of_indexes(const char *record, const RID &rid)

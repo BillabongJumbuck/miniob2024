@@ -29,12 +29,12 @@ class FieldMeta;
 class UpdateStmt : public Stmt
 {
 public:
-  UpdateStmt(Table *table, const FieldMeta *field_meta, Expression* value,  FilterStmt *filter_stmt);
+  UpdateStmt(Table *table, std::vector<const FieldMeta*> &field_metas, std::vector<Expression*> &values,  FilterStmt *filter_stmt);
   ~UpdateStmt() override;
 
   Table *table() const { return table_; }
-  const FieldMeta *field_meta() const { return field_meta_; }
-  Expression* value() const { return value_; }
+  std::vector<const FieldMeta*> & field_metas() { return field_metas_; }
+  std::vector<Expression*> & values() { return values_; }
   FilterStmt *filter_stmt() const { return filter_stmt_; }
 
   StmtType type() const override { return StmtType::UPDATE; }
@@ -43,7 +43,7 @@ public:
 
 private:
   Table *table_ = nullptr;
-  const FieldMeta *field_meta_ = nullptr;
-  Expression* value_;
+  std::vector<const FieldMeta*> field_metas_;
+  std::vector<Expression*> values_;
   FilterStmt *filter_stmt_ = nullptr;
 };
