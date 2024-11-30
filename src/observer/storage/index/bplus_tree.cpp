@@ -1577,7 +1577,7 @@ MemPoolItem::item_unique_ptr BplusTreeHandler::make_key(const char *record, cons
 
   int offset = 0;
   for(int i = 0; i < file_header_.attr_num; i++) {
-    memcpy(static_cast<char *>(key.get()) + file_header_.attr_offset[i], record + file_header_.attr_offset[i], file_header_.attr_length[i]);
+    memcpy(static_cast<char *>(key.get()) + offset, record + file_header_.attr_offset[i], file_header_.attr_length[i]);
     offset += file_header_.attr_length[i];
   }
   memcpy(static_cast<char *>(key.get()) + offset, &rid, sizeof(rid));

@@ -81,17 +81,19 @@ public:
     int cmp_res = 0;
     // TODO: optimized the comparison
 
+    int offset = 0;
     for(size_t i = 0; i < attr_type_.size(); i++) {
       Value left;
       left.set_type(attr_type_[i]);
-      left.set_data(v1 + attr_offset_[i], attr_length_[i]);
+      left.set_data(v1 + offset, attr_length_[i]);
       Value right;
       right.set_type(attr_type_[i]);
-      right.set_data(v2 + attr_offset_[i], attr_length_[i]);
+      right.set_data(v2 + offset, attr_length_[i]);
       cmp_res = DataType::type_instance(attr_type_[i])->compare(left, right);
       if (cmp_res != 0) {
         return cmp_res;
       }
+      offset += attr_length_[i];
     }
     return cmp_res;
   }
