@@ -905,7 +905,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
     return RC::NOMEM;
   }
 
-  key_comparator_.init(file_header->unique, file_header->attr_num, file_header->field_id, file_header->attr_type, file_header->attr_length, file_header->attr_offset);
+  key_comparator_.init(file_header->unique, file_header->attr_num, file_header->attr_type, file_header->attr_length, file_header->attr_offset);
   key_printer_.init(file_header->attr_num, file_header->attr_type, file_header->attr_length);
 
   /*
@@ -977,7 +977,7 @@ RC BplusTreeHandler::open(LogHandler &log_handler, DiskBufferPool &buffer_pool)
   // close old page_handle
   buffer_pool.unpin_page(frame);
 
-  key_comparator_.init(file_header_.unique, file_header_.attr_num, file_header_.field_id, file_header_.attr_type, file_header_.attr_length, file_header_.attr_offset);
+  key_comparator_.init(file_header_.unique, file_header_.attr_num, file_header_.attr_type, file_header_.attr_length, file_header_.attr_offset);
   key_printer_.init(file_header_.attr_num, file_header_.attr_type, file_header_.attr_length);
 
 
@@ -1520,7 +1520,7 @@ RC BplusTreeHandler::recover_init_header_page(BplusTreeMiniTransaction &mtr, Fra
   header_dirty_ = false;
   frame->mark_dirty();
 
-  key_comparator_.init(file_header_.unique, file_header_.attr_num, file_header_.field_id, file_header_.attr_type, file_header_.attr_length, file_header_.attr_offset);
+  key_comparator_.init(file_header_.unique, file_header_.attr_num, file_header_.attr_type, file_header_.attr_length, file_header_.attr_offset);
   key_printer_.init(file_header_.attr_num, file_header_.attr_type, file_header_.attr_length);
 
   return RC::SUCCESS;

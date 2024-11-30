@@ -59,10 +59,9 @@ enum class BplusTreeOperationType
 class AttrComparator
 {
 public:
-  void init(int attr_num, int *field_id, AttrType *type, int *length, int *offset)
+  void init(int attr_num, AttrType *type, int *length, int *offset)
   {
     for (int i = 0; i < attr_num; i++) {
-      field_id_.emplace_back(field_id[i]);
       attr_type_.emplace_back(type[i]);
       attr_length_.emplace_back(length[i]);
       attr_offset_.emplace_back(offset[i]);
@@ -99,7 +98,6 @@ public:
   }
 
 private:
-  std::vector<int> field_id_;
   std::vector<int> attr_length_;
   std::vector<AttrType> attr_type_;
   std::vector<int> attr_offset_;
@@ -113,11 +111,11 @@ private:
 class KeyComparator
 {
 public:
-  void init(AttrType type, int length) { attr_comparator_.init(true, nullptr ,&type, &length, nullptr); }
+  void init(AttrType type, int length) { attr_comparator_.init(true ,&type, &length, nullptr); }
 
-  void init(bool unique, int attr_num, int *field_id, AttrType *type, int *length, int *offset)
+  void init(bool unique, int attr_num, AttrType *type, int *length, int *offset)
   {
-    attr_comparator_.init(attr_num, field_id, type, length, offset);
+    attr_comparator_.init(attr_num, type, length, offset);
     unique_ = unique;
   }
 
