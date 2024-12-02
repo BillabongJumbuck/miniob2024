@@ -144,6 +144,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<Value> *                       value_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
   std::vector<InnerJoinSqlNode> *            join_list;
+  std::vector<std::string> *                 relation_list;
   InnerJoinSqlNode *                         join;
   char *                                     string;
   int                                        number;
@@ -173,6 +174,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <value_list>          value_list
 %type <condition>           where
 %type <string>              storage_format
+%type <relation_list>       rel_list
 %type <join_list>           from_list
 %type <join>                join_list
 %type <expression>          expression
@@ -723,6 +725,23 @@ rel_attr:
 relation:
     ID {
       $$ = $1;
+    }
+    ;
+rel_list:
+    relation {
+      $$ = new std::vector<std::string>();
+      $$->push_back($1);
+      free($1);
+    }
+    | relation COMMA rel_list {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<std::string>;
+      }
+
+      $$->insert($$->begin(), $1);
+      free($1);
     }
     ;
 
