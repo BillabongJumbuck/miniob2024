@@ -64,7 +64,11 @@ Tuple *ProjectPhysicalOperator::current_tuple()
 RC ProjectPhysicalOperator::tuple_schema(TupleSchema &schema) const
 {
   for (const unique_ptr<Expression> &expression : expressions_) {
-    schema.append_cell(expression->name());
+    if (expression->alias().empty()) {
+      schema.append_cell(expression->name());
+    } else {
+      schema.append_cell(expression->alias().c_str());
+    }
   }
   return RC::SUCCESS;
 }

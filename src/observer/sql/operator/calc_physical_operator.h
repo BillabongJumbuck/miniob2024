@@ -62,7 +62,13 @@ public:
   RC tuple_schema(TupleSchema &schema) const override
   {
     for (const std::unique_ptr<Expression> &expression : expressions_) {
-      schema.append_cell(expression->name());
+      // if (expression->alias().empty()) {
+      //     schema.append_cell(expression->name());
+      //   } else {
+      //     schema.append_cell(expression->alias().c_str());
+      //   }
+      string expression_name = expression->name();
+      schema.append_cell("aaaaa");
     }
     return RC::SUCCESS;
   }

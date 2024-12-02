@@ -126,6 +126,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         LENGTH
         ROUND
         DATE_FORMAT
+        AS
 
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
@@ -155,6 +156,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 //非终结符
 
 /** type 定义了各种解析后的结果输出的是什么类型。类型对应了 union 中的定义的成员变量名称 **/
+%type <string>              alias
 %type <number>              type
 %type <expression>          condition
 %type <value>               value
@@ -501,7 +503,15 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list where group_by
+    SELECT expression_list
+    {
+      $$ = new ParsedSqlNode(SCF_SELECT);
+      if ($2 != nullptr) {
+        $$->selection.expressions.swap(*$2);
+        delete $2;
+      }
+    }
+    | SELECT expression_list FROM rel_list where group_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -534,19 +544,27 @@ calc_stmt:
     ;
 
 expression_list:
-    expression
+    expression alias
     {
       $$ = new std::vector<std::unique_ptr<Expression>>;
+      if (nullptr != $2) {
+        $1->set_alias($2);
+      }
       $$->emplace_back($1);
+      free($2);
     }
-    | expression COMMA expression_list
+    | expression alias COMMA expression_list
     {
-      if ($3 != nullptr) {
-        $$ = $3;
+      if ($4 != nullptr) {
+        $$ = $4;
       } else {
         $$ = new std::vector<std::unique_ptr<Expression>>;
       }
-      $$->emplace($$->begin(), $1);
+      if (nullptr != $2) {
+        $1->set_alias($2);
+      }
+      $$->emplace_back($1);
+      free($2);
     }
     ;
 expression:
@@ -610,7 +628,16 @@ expression:
     }
 
     ;
-
+alias:
+    /* empty */ {
+      $$ = nullptr;
+    }
+    | ID {
+      $$ = $1;
+    }
+    | AS ID {
+      $$ = $2;
+    }
 aggr_func_expr:
     ID LBRACE expression RBRACE
     {

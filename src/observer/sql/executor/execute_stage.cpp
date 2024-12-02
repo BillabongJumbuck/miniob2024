@@ -25,6 +25,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/stmt.h"
 #include "storage/default/default_handler.h"
+#include "sql/operator/project_physical_operator.h"
 
 using namespace std;
 using namespace common;
@@ -55,8 +56,30 @@ RC ExecuteStage::handle_request_with_physical_operator(SQLStageEvent *sql_event)
 {
   RC rc = RC::SUCCESS;
 
+  Stmt *stmt = sql_event->stmt();
+  ASSERT(stmt != nullptr, "SQL Statement shouldn't be empty!");
+
   unique_ptr<PhysicalOperator> &physical_operator = sql_event->physical_operator();
   ASSERT(physical_operator != nullptr, "physical operator should not be null");
+
+  // TupleSchema schema;
+  // switch (stmt->type()) {
+  //   case StmtType::SELECT: {
+  //     ProjectPhysicalOperator *project_operator = static_cast<ProjectPhysicalOperator *>(physical_operator.get());
+  //     for (const unique_ptr<Expression> & expr : project_operator->projections()) {
+  //       schema.append_cell(expr->name().c_str());
+  //       if (expr->alias().empty()) {
+  //         schema.append_cell(expr->name().c_str());
+  //       } else {
+  //         schema.append_cell(expr->alias().c_str());
+  //       }
+  //     }
+  //   } break;
+  //   default: {
+  //     // 只有select返回结果
+  //   } break;
+  // }
+
 
   SqlResult *sql_result = sql_event->session_event()->sql_result();
   sql_result->set_operator(std::move(physical_operator));
