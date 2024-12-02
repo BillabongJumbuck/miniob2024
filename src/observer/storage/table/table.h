@@ -85,12 +85,12 @@ public:
   RC delete_record(const Record &record);
   RC delete_record(const RID &rid);
   RC update_record(const Record &record, const Value& value, const FieldMeta *field_meta);
+  RC update_record(const Record &record, std::vector<Value> &values, std::vector<const FieldMeta *> &field_meta);
   RC get_record(const RID &rid, Record &record);
 
   RC recover_insert_record(Record &record);
 
-  // TODO refactor
-  RC create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name);
+  RC create_index(bool unique,Trx *trx, std::vector<const FieldMeta*> field_meta, const char *index_name);
 
   RC get_record_scanner(RecordFileScanner &scanner, Trx *trx, ReadWriteMode mode);
 

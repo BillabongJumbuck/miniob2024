@@ -21,11 +21,11 @@ See the Mulan PSL v2 for more details. */
 
 #include <storage/table/table.h>
 
-UpdateStmt::UpdateStmt(Table *table, const FieldMeta *field_meta, Value value,  FilterStmt *filter_stmt)
+UpdateStmt::UpdateStmt(Table *table, std::vector<const FieldMeta*> &field_metas, std::vector<Expression*> &values,  FilterStmt *filter_stmt)
 {
   table_ = table;
-  field_meta_ = field_meta;
-  value_ = value;
+  field_metas_ = field_metas;
+  values_ = values;
   filter_stmt_ = filter_stmt;
 }
 
@@ -54,30 +54,71 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   }
 
   // 检查属性名是否为空
-  const char *attr_name = update.attribute_name.c_str();
-  if(common::is_blank(attr_name)) {
-    LOG_WARN("invalid argument. db=%p, attr_name=%p", db, attr_name);
-    return RC::INVALID_ARGUMENT;
+  std::vector<const FieldMeta*> field_metas;
+  for(auto &attr_name : update.attribute_names) {
+    auto attr_name_cstring = attr_name.c_str();
+    if(common::is_blank(attr_name_cstring)) {
+      LOG_WARN("invalid argument. db=%p, attr_name=%p", db, attr_name);
+      return RC::INVALID_ARGUMENT;
+    }
+
+    // 检查属性名是否存在
+    const FieldMeta *field_meta = table->table_meta().field(attr_name_cstring);
+    if(field_meta == nullptr) {
+      LOG_WARN("update table error :no such attribute. db=%s, attr_name=%s", db->name(), attr_name);
+      return RC::SCHEMA_FIELD_NOT_EXIST;
+    }
+
+    field_metas.push_back(field_meta);
   }
 
-  // 检查属性名是否存在
-  const FieldMeta *field_meta = table->table_meta().field(attr_name);
-  if(field_meta == nullptr) {
-    LOG_WARN("update table error :no such attribute. db=%s, attr_name=%s", db->name(), attr_name);
-    return RC::SCHEMA_FIELD_NOT_EXIST;
-  }
 
-  // 检查类型是否一致
-  Value value = update.value;
-  if(!value.is_null() && value.attr_type() != field_meta->type()) {
-    LOG_WARN("invalid argument. db=%p, attr_name=%p", db, attr_name);
-    return RC::INVALID_ARGUMENT;
-  }
+  std::vector<Expression*> values;
+  for(size_t i = 0; i < update.values.size(); i++) {
+    Expression *value_expr = update.values[i];
+    // 处理子查询
+    if(value_expr -> type() == ExprType::SUBQUERY) {
+      SubQueryExpr *subquery_expr = dynamic_cast<SubQueryExpr *>(value_expr);
+      RC rc = subquery_expr->Create_stmt(db);
+      if(OB_FAIL(rc)) {
+        LOG_WARN("can not create stmt in subquery expr in update");
+        return rc;
+      }
+      values.push_back(value_expr);
+      continue;
+    }
+    // 类型检查
+    Value value;
+    // 检查类型是否一致
+    if(value_expr -> type() == ExprType::VALUE) {
+      value = dynamic_cast<ValueExpr *>(value_expr)->get_value();
+      // patch:转换日期类型
+      if(field_metas[i]->type() == AttrType::DATES) {
+        // 从 'yyyy-mm-dd' 找出 y, m ,d 三个变量
+        const char* temp = value.data();
+        int y, m ,d;
+        // 提取年份
+        y = (temp[0] - '0') * 1000 + (temp[1] - '0') * 100 + (temp[2] - '0') * 10 + (temp[3] - '0');
 
-  // 检查是否将null插入非null属性
-  if(value.is_null() && !field_meta->is_nullable()) {
-    LOG_WARN("invalid argument. db=%p, attr_name=%p", db, attr_name);
-    return RC::INVALID_ARGUMENT;
+        // 提取月份
+        m = (temp[5] - '0') * 10 + (temp[6] - '0');
+
+        // 提取日期
+        d = (temp[8] - '0') * 10 + (temp[9] - '0');
+        value.set_date(y,m,d);
+      }
+      if( !value.is_null() &&  value.attr_type() != field_metas[i]->type()) {
+        LOG_WARN("invalid argument. db=%p, attr_name=%p", db, field_metas[i]->name());
+        return RC::INVALID_ARGUMENT;
+      }
+
+      // 检查是否将null插入非null属性
+      if(value.is_null() && !field_metas[i]->is_nullable()) {
+        LOG_WARN("invalid argument. db=%p, attr_name=%p", db, field_metas[i]->name());
+        return RC::INVALID_ARGUMENT;
+      }
+      values.push_back(new ValueExpr(value));
+    }
   }
 
   // create filter statement in `where` statement
@@ -104,6 +145,6 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     }
   }
 
-  stmt = new UpdateStmt(table, field_meta, value, filter_stmt);
+  stmt = new UpdateStmt(table, field_metas, values, filter_stmt);
   return RC::SUCCESS;
 }

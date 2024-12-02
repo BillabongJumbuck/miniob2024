@@ -255,6 +255,14 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
       LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
       return rc;
     }
+  }else if(left_child-> type() == ExprType::SUBQUERY) {
+    auto subquery_expr = dynamic_cast<SubQueryExpr*>(left_child.get());
+    rc = subquery_expr->Create_stmt(db);
+    // 判断rc
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to process subquery expression. rc=%s", strrc(rc));
+      return rc;
+    }
   }
 
   // Expression *right_child = expr->right().get();
@@ -279,6 +287,14 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
     // 判断rc
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  }else if(right_child-> type() == ExprType::SUBQUERY) {
+    auto subquery_expr = dynamic_cast<SubQueryExpr*>(right_child.get());
+    rc = subquery_expr->Create_stmt(db);
+    // 判断rc
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to process subquery expression. rc=%s", strrc(rc));
       return rc;
     }
   }
@@ -597,8 +613,8 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
 RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, std::unique_ptr<LogicalOperator> &logical_operator)
 {
   Table *table = update_stmt->table();
-  const FieldMeta *field_meta = update_stmt->field_meta();
-  Value value = update_stmt->value();
+  std::vector<const FieldMeta*> field_metas = update_stmt->field_metas();
+  std::vector<Expression*> values = update_stmt->values();
   FilterStmt                 *filter_stmt = update_stmt->filter_stmt();
   unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_WRITE));
 
@@ -609,7 +625,7 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, std::unique_ptr<Lo
     return rc;
   }
 
-  unique_ptr<LogicalOperator> update_opr(new UpdateLogicalOperator(table, field_meta, value));
+  unique_ptr<LogicalOperator> update_opr(new UpdateLogicalOperator(table, field_metas, values));
 
   if (predicate_oper) {
     predicate_oper->add_child(std::move(table_get_oper));

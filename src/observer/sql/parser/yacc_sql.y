@@ -123,6 +123,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         L2_DISTANCE
         COSINE_DISTANCE
         INNER_PRODUCT
+        IN_OP
+        EXISTS_OP
+        UNIQUE
 
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
@@ -135,6 +138,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<AttrInfoSqlNode> *             attr_infos;
   AttrInfoSqlNode *                          attr_info;
   Expression *                               expression;
+  UpdateItem *                               update_item_ptr;
+  std::vector<UpdateItem>*                   update_item_list_ptr;
   std::vector<std::unique_ptr<Expression>> * expression_list;
   std::vector<Value> *                       value_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
@@ -159,6 +164,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <number>              number
 %type <boolean>             null_option
 %type <boolean>             is_null_comp
+%type <boolean>             unique_tag
 %type <string>              relation
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
@@ -171,8 +177,13 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <join>                join_list
 %type <expression>          expression
 %type <expression>          aggr_func_expr
+%type <expression>          sub_query_expr
+%type <expression>          value_list_expr
+%type <value_list>          value_list_ssq
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
+%type <update_item_ptr>     update_item;
+%type <update_item_list_ptr> update_item_list;
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
@@ -292,16 +303,32 @@ desc_table_stmt:
     ;
 
 create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE INDEX ID ON ID LBRACE ID RBRACE
+    CREATE unique_tag INDEX ID ON ID LBRACE rel_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
-      create_index.index_name = $3;
-      create_index.relation_name = $5;
-      create_index.attribute_name = $7;
-      free($3);
-      free($5);
-      free($7);
+      create_index.unique_tag = $2;
+      create_index.index_name = $4;
+      create_index.relation_name = $6;
+
+      if ($8 != nullptr) {
+        create_index.attribute_name.swap(*$8);
+        delete $8;
+      }
+
+      free($4);
+      free($6);
+    }
+    ;
+
+unique_tag:
+    /* empty */
+    {
+      $$ = false;
+    }
+    | UNIQUE
+    {
+      $$ = true;
     }
     ;
 
@@ -486,17 +513,47 @@ delete_stmt:    /*  delete 语句的语法解析树*/
     }
     ;
 update_stmt:      /*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value where 
+    UPDATE ID SET update_item_list where
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
       $$->update.relation_name = $2;
-      $$->update.attribute_name = $4;
-      $$->update.value = *$6;
-      if ($7 != nullptr) {
-        $$->update.conditions = $7;
+      for(auto &item: *$4) {
+        $$->update.attribute_names.push_back(item.attr_name);
+        $$->update.values.push_back(item.value);
+      }
+      std::reverse($$->update.attribute_names.begin(), $$->update.attribute_names.end());
+      std::reverse($$->update.values.begin(), $$->update.values.end());
+      if ($5 != nullptr) {
+        $$->update.conditions = $5;
       }
       free($2);
-      free($4);
+    }
+    ;
+update_item_list:
+    update_item
+    {
+        $$ = new std::vector<UpdateItem>;
+        $$->emplace_back(*$1);
+        delete $1;
+    }
+    | update_item COMMA update_item_list
+    {
+        if ($3 != nullptr) {
+            $$ = $3;
+        } else {
+            $$ = new std::vector<UpdateItem>;
+        }
+        $$->emplace_back(*$1);
+        delete $1;
+    }
+    ;
+
+update_item:
+    ID EQ expression
+    {
+      $$ = new UpdateItem;
+      $$->attr_name = $1;
+      $$->value = $3;
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
@@ -585,6 +642,12 @@ expression:
     | aggr_func_expr {
       $$ = $1; // AggrFuncExpr
     }
+    | sub_query_expr {
+      $$ = $1; // SubQueryExpr
+    }
+    | value_list_expr {
+      $$ = $1; // ValueListExpr
+    }
     // your code here
     | L2_DISTANCE LBRACE expression COMMA expression RBRACE {
         $$ = create_arithmetic_expression(ArithmeticExpr::Type::LD, $3, $5, sql_string, &@$);
@@ -601,6 +664,44 @@ aggr_func_expr:
     ID LBRACE expression RBRACE
     {
       $$ = create_aggregate_expression($1, $3, sql_string, &@$);
+    }
+    ;
+
+sub_query_expr:
+    LBRACE select_stmt RBRACE
+    {
+      $$ = new SubQueryExpr(std::move($2->selection));
+      delete $2;
+    }
+    ;
+
+value_list_expr:
+    LBRACE value value_list_ssq RBRACE
+    {
+      ValueListExpr* value_list_expr = new ValueListExpr();
+      if($3 != nullptr){
+        value_list_expr->get_value_list().swap(*$3);
+        delete $3;
+      }
+      value_list_expr->get_value_list().emplace_back(*$2);
+      std::reverse(value_list_expr->get_value_list().begin(), value_list_expr->get_value_list().end());
+      delete $2;
+      $$ = value_list_expr;
+    }
+
+value_list_ssq:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | COMMA value value_list_ssq  {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<Value>;
+      }
+      $$->emplace_back(*$2);
+      delete $2;
     }
     ;
 
@@ -688,6 +789,10 @@ comp_op:
     | NE { $$ = NOT_EQUAL; }
     | LIKE_OP { $$ = LIKE; }
     | NOT LIKE_OP { $$ = NOT_LIKE; }
+    | IN_OP {$$ = IN; }
+    | NOT IN_OP {$$ = NOT_IN;}
+    | EXISTS_OP {$$ = EXISTS;}
+    | NOT EXISTS_OP {$$ = NOT_EXISTS; }
     ;
 
 is_null_comp:

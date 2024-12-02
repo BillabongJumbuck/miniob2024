@@ -21,7 +21,10 @@ See the Mulan PSL v2 for more details. */
 #include "storage/field/field.h"
 #include "sql/expr/aggregator.h"
 #include "storage/common/chunk.h"
+#include "sql/operator/logical_operator.h"
 
+class Stmt;
+class LogicalOperator;
 class Tuple;
 
 /**
@@ -47,6 +50,8 @@ enum class ExprType
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
   AGGREGATION,  ///< 聚合运算
+  SUBQUERY,     ///< 子查询
+  VALUELIST     ///< 多个值的列表
 };
 
 /**
@@ -306,7 +311,14 @@ public:
    * @param value the result of comparison
    */
   RC compare_value(const Value &left, const Value &right, bool &value) const;
-  
+
+  /**
+   * 比较含有子查寻的表达式
+   */
+  RC compare_subquery_left(const Value &right, bool &value) const;
+  RC compare_subquery_right(const Value &left, bool &value) const;
+  RC compare_valuelist(bool is_left, const Value &a, bool &value) const;
+
   bool match_pattern(const char* pattern, const char* str) const;
 
   template <typename T>
@@ -476,4 +488,49 @@ public:
 private:
   Type                        aggregate_type_;
   std::unique_ptr<Expression> child_;
+};
+
+class SubQueryExpr : public Expression
+{
+public:
+  SubQueryExpr(SelectSqlNode select_sql_node);
+  virtual ~SubQueryExpr() = default;
+  ExprType type() const override { return ExprType::SUBQUERY; }
+  RC get_value(const Tuple &tuple, Value &value) const override;
+  AttrType value_type() const override;
+
+  SelectSqlNode& select_sql_node() { return select_sql_node_; }
+  Stmt* select_stmt() { return select_stmt_; }
+  unique_ptr<LogicalOperator> &logical_plan() { return logical_plan_; }
+  void add_result(const Value& value) { sub_query_result.push_back(value); }
+  vector<Value>& get_result_vector() { return sub_query_result; }
+  void set_has_result() { has_result = true; }
+  bool has_result_vector() { return has_result; }
+
+
+  RC Create_stmt(Db *db);
+  RC LogicalPlanGenerate();
+
+private:
+
+  SelectSqlNode select_sql_node_;
+  Stmt *select_stmt_;
+  unique_ptr<LogicalOperator> logical_plan_ = nullptr;
+  std::vector<Value> sub_query_result;
+  bool has_result = false;
+};
+
+class ValueListExpr : public Expression
+{
+public:
+  ValueListExpr();
+  virtual ~ValueListExpr() = default;
+  ExprType type() const override { return ExprType::VALUELIST; }
+  RC get_value(const Tuple &tuple, Value &value) const override;
+  AttrType value_type() const override;
+
+  void add_value(const Value &value) { value_list_.push_back(value); }
+  std::vector<Value>& get_value_list() { return value_list_; }
+private:
+  std::vector<Value> value_list_;
 };

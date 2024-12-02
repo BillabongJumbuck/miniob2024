@@ -21,7 +21,9 @@ FOREACH (F ${ALL_SRC})
                 sql/operator/update_physical_oprator.cpp
                 sql/operator/update_physical_oprator.h
                 common/type/null_type.cpp
-                common/type/null_type.h)
+                common/type/null_type.h
+                sql/optimizer/subquery_simplification_rule.cpp
+                sql/optimizer/subquery_simplification_rule.h)
         MESSAGE("Use " ${F})
     ENDIF()
 

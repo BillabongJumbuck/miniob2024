@@ -191,19 +191,26 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
   const int index_num = table_meta_.index_num();
   for (int i = 0; i < index_num; i++) {
     const IndexMeta *index_meta = table_meta_.index(i);
-    const FieldMeta *field_meta = table_meta_.field(index_meta->field());
-    if (field_meta == nullptr) {
-      LOG_ERROR("Found invalid index meta info which has a non-exists field. table=%s, index=%s, field=%s",
-                name(), index_meta->name(), index_meta->field());
-      // skip cleanup
-      //  do all cleanup action in destructive Table function
-      return RC::INTERNAL;
+    std::vector<const FieldMeta *> field_metas;
+    const std::vector<std::string> &field_names = index_meta->field();
+    for (size_t j = 0; j < field_names.size(); j++) {
+      const FieldMeta *field_meta = table_meta_.field(field_names[j].c_str());
+      if (field_meta == nullptr) {
+        LOG_ERROR("Found invalid index meta info which has a non-exists field. table=%s, index=%s, field=%s",
+            name(),
+            index_meta->name(),
+            index_meta->field().data());
+        // skip cleanup
+        //  do all cleanup action in destructive Table function
+        return RC::INTERNAL;
+      }
+      field_metas.emplace_back(field_meta);
     }
 
     BplusTreeIndex *index      = new BplusTreeIndex();
     string          index_file = table_index_file(base_dir, name(), index_meta->name());
 
-    rc = index->open(this, index_file.c_str(), *index_meta, *field_meta);
+    rc                         = index->open(this, index_file.c_str(), *index_meta, field_metas);
     if (rc != RC::SUCCESS) {
       delete index;
       LOG_ERROR("Failed to open index. table=%s, index=%s, file=%s, rc=%s",
@@ -228,6 +235,14 @@ RC Table::insert_record(Record &record)
   }
 
   rc = insert_entry_of_indexes(record.data(), record.rid());
+
+  // 处理UNIQUE
+  if(rc == RC::RECORD_DUPLICATE_KEY) {
+    LOG_INFO("duplicate in unique index");
+    record_handler_->delete_record(&record.rid());
+    return rc;
+  }
+
   if (rc != RC::SUCCESS) {  // 可能出现了键值重复
     RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), false /*error_on_not_exists*/);
     if (rc2 != RC::SUCCESS) {
@@ -403,19 +418,19 @@ RC Table::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode m
   return rc;
 }
 
-RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name)
+RC Table::create_index(bool unique,Trx *trx, std::vector<const FieldMeta*> field_meta, const char *index_name)
 {
-  if (common::is_blank(index_name) || nullptr == field_meta) {
+  if (common::is_blank(index_name)) {
     LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name());
     return RC::INVALID_ARGUMENT;
   }
 
   IndexMeta new_index_meta;
 
-  RC rc = new_index_meta.init(index_name, *field_meta);
+  RC rc = new_index_meta.init(unique, index_name, field_meta);
   if (rc != RC::SUCCESS) {
-    LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s", 
-             name(), index_name, field_meta->name());
+    LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s ",
+             name(), index_name);
     return rc;
   }
 
@@ -423,7 +438,7 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
   BplusTreeIndex *index      = new BplusTreeIndex();
   string          index_file = table_index_file(base_dir_.c_str(), name(), index_name);
 
-  rc = index->create(this, index_file.c_str(), new_index_meta, *field_meta);
+  rc = index->create(this, index_file.c_str(), unique, new_index_meta, field_meta);
   if (rc != RC::SUCCESS) {
     delete index;
     LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
@@ -441,7 +456,11 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
 
   Record record;
   while (OB_SUCC(rc = scanner.next(record))) {
-    rc = index->insert_entry(record.data(), &record.rid());
+    if(unique) {
+      rc = index->insert_entry_unique(record.data(), &record.rid());
+    }else {
+      rc = index->insert_entry(record.data(), &record.rid());
+    }
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to insert record into index while creating index. table=%s, index=%s, rc=%s",
                name(), index_name, strrc(rc));
@@ -544,16 +563,54 @@ RC Table::update_record(const Record &record, const Value& value, const FieldMet
   memcpy(new_record.data() + field_meta->offset(), src, copy_len);
 
   RC rc = RC::SUCCESS;
+
+  rc = insert_record(new_record);
+  if (rc != RC::SUCCESS) {
+    LOG_INFO("Failed to insert new record when update! table=%s, field=%s, value=%s",
+      this->name(), field_meta->name(), value.data());
+    return rc;
+  }
+
   rc = delete_record(record);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to delete old record when update! table=%s, field=%s, value=%s",
       this->name(), field_meta->name(), value.data());
     return rc;
   }
+
+  return rc;
+}
+RC Table::update_record(const Record &record, std::vector<Value> &values, std::vector<const FieldMeta *> &field_meta){
+  Record new_record = record;
+
+  for(size_t i = 0; i < values.size(); i++){
+    size_t       copy_len = field_meta[i]->len();
+    const size_t data_len = values[i].length();
+
+    const char *src = values[i].data();
+    if(values[i].is_null()) {
+      src = Value::to_null_storage();
+      copy_len = strlen(src) + 1;
+    }else if (field_meta[i]->type() == AttrType::CHARS) {
+      if (copy_len > data_len) {
+        copy_len = data_len + 1;
+      }
+    }
+    memcpy(new_record.data() + field_meta[i]->offset(), src, copy_len);
+  }
+  RC rc = RC::SUCCESS;
+
   rc = insert_record(new_record);
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to insert new record when update! table=%s, field=%s, value=%s",
-      this->name(), field_meta->name(), value.data());
+    LOG_INFO("Failed to insert new record when update! table=%s, field=%s, value=%s",
+      this->name(), field_meta[0]->name(), values[0].data());
+    return rc;
+  }
+
+  rc = delete_record(record);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to delete old record when update! table=%s, field=%s, value=%s",
+      this->name(), field_meta[0]->name(), values[0].data());
     return rc;
   }
 
@@ -565,7 +622,11 @@ RC Table::insert_entry_of_indexes(const char *record, const RID &rid)
 {
   RC rc = RC::SUCCESS;
   for (Index *index : indexes_) {
-    rc = index->insert_entry(record, &rid);
+    if(index ->index_meta().is_unique()) {
+      rc = index->insert_entry_unique(record, &rid);
+    }else {
+      rc = index->insert_entry(record, &rid);
+    }
     if (rc != RC::SUCCESS) {
       break;
     }

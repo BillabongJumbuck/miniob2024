@@ -17,7 +17,7 @@ class UpdateStmt;
 class UpdatePhysicalOperator : public PhysicalOperator
 {
 public:
-  UpdatePhysicalOperator(Table *table, const FieldMeta *field_meta, Value value);
+  UpdatePhysicalOperator(Table *table, std::vector<const FieldMeta*> &field_metas, std::vector<Expression*> &values);
 
   virtual ~UpdatePhysicalOperator() = default;
 
@@ -31,8 +31,8 @@ public:
 
 private:
   Table               *table_      = nullptr;
-  const FieldMeta     *field_meta_ = nullptr;
-  Value               value_                ;
+  std::vector<const FieldMeta*>field_metas_ ;
+  std::vector<Expression*>          values_ ;
   Trx                 *trx_        = nullptr;
   std::vector<Record> records_              ;
 };

@@ -20,6 +20,12 @@ See the Mulan PSL v2 for more details. */
 
 #include <gtest/internal/gtest-internal.h>
 
+#include <utility>
+#include <sql/optimizer/logical_plan_generator.h>
+#include <sql/optimizer/physical_plan_generator.h>
+#include <sql/stmt/select_stmt.h>
+
+
 using namespace std;
 
 RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
@@ -269,13 +275,168 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
   }
 
   bool bool_value = false;
-
-  rc = compare_value(left_value, right_value, bool_value);
+  if(left_->type() == ExprType::SUBQUERY) {
+    rc = compare_subquery_left(right_value, bool_value);
+  }else if(right_->type() == ExprType::SUBQUERY) {
+    rc = compare_subquery_right(left_value, bool_value);
+  }else if(left_ -> type() == ExprType::VALUELIST) {
+    rc = compare_valuelist(true, right_value, bool_value);
+  }else if(right_-> type() == ExprType::VALUELIST) {
+      rc = compare_valuelist(false, left_value, bool_value);
+  }
+  else {
+    rc = compare_value(left_value, right_value, bool_value);
+  }
   if (rc == RC::SUCCESS) {
     value.set_boolean(bool_value);
   }
   return rc;
 }
+
+RC ComparisonExpr::compare_subquery_left(const Value &right, bool &value) const {
+  SubQueryExpr* subquery_expr = dynamic_cast<SubQueryExpr*>(left_.get());
+  std::vector<Value> result_vector = subquery_expr->get_result_vector();
+  value = false;
+
+  switch (comp_) {
+    case IN:
+      for (auto iter = result_vector.begin(); iter != result_vector.end(); iter++) {
+        if (right.compare(*iter) == 0) {
+          value = true;
+          break;
+        }
+      }
+    return RC::SUCCESS;
+
+    case NOT_IN:
+      value = true;
+      for (auto iter = result_vector.begin(); iter != result_vector.end(); iter++) {
+        if (right.compare(*iter) == 0) {
+          value = false;
+          break;
+      }
+    }
+    return RC::SUCCESS;
+
+    case EXISTS:
+      value = result_vector.size() > 0;
+    return RC::SUCCESS;
+
+    case NOT_EXISTS:
+      value = result_vector.size() == 0;
+    return RC::SUCCESS;
+
+    case EQUAL_TO:
+    case LESS_EQUAL:
+    case NOT_EQUAL:
+    case LESS_THAN:
+    case GREAT_EQUAL:
+    case GREAT_THAN:
+      if (result_vector.size() > 1) {
+        LOG_WARN("subquery result size is more than one");
+        return RC::INTERNAL;
+      }else if(result_vector.size() == 0) {
+        value = false;
+        return RC::SUCCESS;
+      }else {
+        return compare_value(result_vector[0], right, value);
+      }
+
+    default:
+      LOG_WARN("unsupported comparison. %d", comp_);
+    return RC::INTERNAL;
+  }
+}
+
+RC ComparisonExpr::compare_subquery_right(const Value &left, bool &value) const {
+  SubQueryExpr* subquery_expr = dynamic_cast<SubQueryExpr*>(right_.get());
+  std::vector<Value> result_vector = subquery_expr->get_result_vector();
+  value = false;
+
+  switch (comp_) {
+    case IN:
+      for (auto iter = result_vector.begin(); iter != result_vector.end(); iter++) {
+        if (left.compare(*iter) == 0) {
+          value = true;
+          break;
+        }
+      }
+    return RC::SUCCESS;
+
+    case NOT_IN:
+      value = true;
+    for (auto iter = result_vector.begin(); iter != result_vector.end(); iter++) {
+      if (left.compare(*iter) == 0) {
+        value = false;
+        break;
+      }
+    }
+    return RC::SUCCESS;
+
+    case EXISTS:
+      value = result_vector.size() > 0;
+    return RC::SUCCESS;
+
+    case NOT_EXISTS:
+      value = result_vector.size() == 0;
+    return RC::SUCCESS;
+
+    case EQUAL_TO:
+    case LESS_EQUAL:
+    case NOT_EQUAL:
+    case LESS_THAN:
+    case GREAT_EQUAL:
+    case GREAT_THAN:
+      if (result_vector.size() > 1) {
+        LOG_WARN("subquery result size is more than one");
+        return RC::ERROR_IN_SSQ;
+      } else if(result_vector.size() == 0) {
+        value = false;
+        return RC::SUCCESS;
+      } else {
+        return compare_value(left, result_vector[0], value);
+      }
+
+    default: LOG_WARN("unsupported comparison. %d", comp_);
+    return RC::INTERNAL;
+  }
+}
+
+RC ComparisonExpr::compare_valuelist(bool is_left,const Value &a, bool &value) const{
+  ValueListExpr* expr = nullptr;
+  if(is_left) {
+    expr = dynamic_cast<ValueListExpr*>(left_.get());
+  }else {
+    expr = dynamic_cast<ValueListExpr*>(right_.get());
+  }
+  std::vector<Value> values_list = expr->get_value_list();
+  value = false;
+
+  switch (comp_) {
+    case IN:
+      for (auto & iter : values_list) {
+      if (a.compare(iter) == 0) {
+        value = true;
+        break;
+      }
+    }
+    return RC::SUCCESS;
+
+    case NOT_IN:
+      value = true;
+      for (auto & iter : values_list) {
+          if (a.compare(iter) == 0) {
+            value = false;
+            break;
+        }
+      }
+      return RC::SUCCESS;
+    default:
+      LOG_WARN("unsupported comparison. %d", comp_);
+      return RC::INTERNAL;
+  }
+}
+
 
 RC ComparisonExpr::eval(Chunk &chunk, std::vector<uint8_t> &select)
 {
@@ -366,7 +527,7 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
   if (rc == RC::INVALID_ARGUMENT) {
     LOG_DEBUG("divide by zero!");
     left_value.set_boolean(false);
-    rc = RC::SUCCESS;
+    // rc = RC::SUCCESS;
   }else if (rc != RC::SUCCESS) {
     LOG_WARN("failed to get value by left child expression. rc=%s", strrc(rc));
     return rc;
@@ -379,7 +540,7 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
       if (rc == RC::INVALID_ARGUMENT) {
         LOG_DEBUG("divide by zero!");
         right_value.set_boolean(false);
-        rc =   RC::SUCCESS;
+        // rc =   RC::SUCCESS;
       }else if (rc != RC::SUCCESS) {
         LOG_WARN("failed to get value by right child expression. rc=%s", strrc(rc));
         return rc;
@@ -395,7 +556,7 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
       if (rc == RC::INVALID_ARGUMENT) {
         LOG_DEBUG("divide by zero!");
         right_value.set_boolean(false);
-        rc = RC::SUCCESS;
+        // rc = RC::SUCCESS;
       }else if (rc != RC::SUCCESS) {
         LOG_WARN("failed to get value by right child expression. rc=%s", strrc(rc));
         return rc;
@@ -755,3 +916,67 @@ RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &ty
   }
   return rc;
 }
+
+SubQueryExpr::SubQueryExpr(SelectSqlNode select_sql_node)
+  : select_sql_node_(std::move(select_sql_node))
+{
+  this->sub_query_result = std::vector<Value>();
+}
+
+RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const {
+  if(this->sub_query_result.size() == 0) {
+    value.set_null();
+  }else {
+    value.set_value(this->sub_query_result[0]);
+  }
+  return RC::SUCCESS;
+}
+
+AttrType SubQueryExpr::value_type() const{
+  auto stmt = dynamic_cast<SelectStmt*>(this->select_stmt_);
+  auto& query = stmt->query_expressions();
+  if(query.size() != 1) {
+    return AttrType::UNDEFINED;
+  }else {
+    return query[0]->value_type();
+  }
+}
+
+RC SubQueryExpr::Create_stmt(Db *db){
+  return SelectStmt::create(db, this->select_sql_node_, this->select_stmt_);
+}
+
+RC SubQueryExpr::LogicalPlanGenerate(){
+  RC rc = LogicalPlanGenerator::create(this->select_stmt_, this->logical_plan_);
+  // 判断RC
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to create logical plan in sub query");
+    return rc;
+  }
+  return RC::SUCCESS;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+ValueListExpr::ValueListExpr()
+{
+  this->value_list_ = std::vector<Value>();
+}
+
+RC ValueListExpr::get_value(const Tuple &tuple, Value &value) const {
+  if(this->value_list_.size() == 0) {
+    value.set_null();
+  }else {
+    value.set_value(this->value_list_[0]);
+  }
+  return RC::SUCCESS;
+}
+
+AttrType ValueListExpr::value_type() const{
+  if(this->value_list_.size() == 0) {
+      return AttrType::UNDEFINED;
+  }else{
+    return this->value_list_[0].attr_type();
+  }
+}
+
+
