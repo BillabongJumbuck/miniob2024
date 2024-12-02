@@ -144,6 +144,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<Value> *                       value_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
   std::vector<InnerJoinSqlNode> *            join_list;
+  std::vector<std::string> *                 relation_list;
   InnerJoinSqlNode *                         join;
   char *                                     string;
   int                                        number;
@@ -173,6 +174,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <value_list>          value_list
 %type <condition>           where
 %type <string>              storage_format
+%type <relation_list>       rel_list
 %type <join_list>           from_list
 %type <join>                join_list
 %type <expression>          expression
@@ -246,7 +248,7 @@ command_wrapper:
   | exit_stmt
     ;
 
-exit_stmt:      
+exit_stmt:
     EXIT {
       (void)yynerrs;  // 这么写为了消除yynerrs未使用的告警。如果你有更好的方法欢迎提PR
       $$ = new ParsedSqlNode(SCF_EXIT);
@@ -381,7 +383,7 @@ attr_def_list:
       delete $2;
     }
     ;
-    
+
 attr_def:
     ID type LBRACE number RBRACE null_option
     {
@@ -452,7 +454,7 @@ value_list:
     {
       $$ = nullptr;
     }
-    | COMMA value value_list  { 
+    | COMMA value value_list  {
       if ($3 != nullptr) {
         $$ = $3;
       } else {
@@ -500,9 +502,9 @@ storage_format:
       $$ = $4;
     }
     ;
-    
+
 delete_stmt:    /*  delete 语句的语法解析树*/
-    DELETE FROM ID where 
+    DELETE FROM ID where
     {
       $$ = new ParsedSqlNode(SCF_DELETE);
       $$->deletion.relation_name = $3;
@@ -723,6 +725,23 @@ rel_attr:
 relation:
     ID {
       $$ = $1;
+    }
+    ;
+rel_list:
+    relation {
+      $$ = new std::vector<std::string>();
+      $$->push_back($1);
+      free($1);
+    }
+    | relation COMMA rel_list {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<std::string>;
+      }
+
+      $$->insert($$->begin(), $1);
+      free($1);
     }
     ;
 
