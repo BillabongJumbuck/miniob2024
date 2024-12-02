@@ -81,11 +81,11 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       if(subquery_expr->get_result_vector().size() > 1) {
         LOG_WARN("subquery result size is not 1!");
         return RC::INVALID_ARGUMENT;
-      }else if(subquery_expr->get_result_vector().size() == 0) {
-        if(!field_metas_[i]->is_nullable()) {
-          LOG_WARN("subquery result is empty but field is not nullable!");
-          return RC::SUCCESS;
-        }
+      }else if(subquery_expr->get_result_vector().empty()) {
+        // if(!field_metas_[i]->is_nullable()) {
+        //   LOG_WARN("subquery result is empty but field is not nullable!");
+        //   return RC::SUCCESS;
+        // }
         value.set_null();
       }else  {
         value = subquery_expr->get_result_vector()[0];
