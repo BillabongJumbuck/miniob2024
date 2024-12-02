@@ -45,27 +45,31 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   vector<Table *>                tables;
   unordered_map<string, Table *> table_map;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
-    const char *table_name = select_sql.relations[i].c_str();
-    if (nullptr == table_name) {
-      LOG_WARN("invalid argument. relation name is null. index=%d", i);
-      return RC::INVALID_ARGUMENT;
-    }
+    for(size_t j=0; j < select_sql.relations[i].tables.size();j++) {
+      const char *table_name = select_sql.relations[i].tables[j].c_str();
+      if(table_name == nullptr){
+        LOG_WARN("invalid argument. table name is null. index=%d", j);
+        return RC::INVALID_ARGUMENT;
+      }
+      Table *table = db->find_table(table_name);
+      if (nullptr == table) {
+        LOG_WARN("no such table. db=%s, table_name=%s", db->name(), select_sql.relations[i].tables[j].c_str());
+        return RC::SCHEMA_TABLE_NOT_EXIST;
+      }
 
-    Table *table = db->find_table(table_name);
-    if (nullptr == table) {
-      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
-      return RC::SCHEMA_TABLE_NOT_EXIST;
+      // 查找是否已经存在
+      if (table_map.find(table->name()) == table_map.end()) {
+        binder_context.add_table(table);
+        tables.push_back(table);
+        table_map.insert({table_name, table});
+      }
     }
-
-    binder_context.add_table(table);
-    tables.push_back(table);
-    table_map.insert({table_name, table});
   }
 
   // collect query fields in `select` statement
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder expression_binder(binder_context);
-  
+
   for (unique_ptr<Expression> &expression : select_sql.expressions) {
     RC rc = expression_binder.bind_expression(expression, bound_expressions);
     if (OB_FAIL(rc)) {
@@ -87,30 +91,25 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   if (tables.size() == 1) {
     default_table = tables[0];
   }
-
-  // create filter statement in `where` statement
-  FilterStmt *filter_stmt;
-  if(select_sql.conditions == nullptr) {
-    filter_stmt = nullptr;
-  }else {
-    filter_stmt = new FilterStmt();
-    if(select_sql.conditions->type() == ExprType::COMPARISON) {
-      RC rc = filter_stmt->create(dynamic_cast<ComparisonExpr *>(select_sql.conditions), default_table, db);
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("cannot construct filter stmt");
-        return rc;
+  ConjunctionExpr *on_conditions = new ConjunctionExpr(ConjunctionExpr::Type::AND, new ValueExpr(Value(true)), new ValueExpr(Value(true)));
+  for(auto vec : select_sql.relations) {
+    if(!vec.conditions.empty()){
+      for(auto cond : vec.conditions) {
+        Expression* temp = on_conditions;
+        on_conditions = new ConjunctionExpr(ConjunctionExpr::Type::AND, cond, temp);
       }
-    }else if ( select_sql.conditions->type() == ExprType::CONJUNCTION){
-      RC rc = filter_stmt->create(dynamic_cast<ConjunctionExpr *>(select_sql.conditions), default_table, db);
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("cannot construct filter stmt");
-        return rc;
-      }
-    }else {
-      LOG_WARN("invalid condition type");
-      return RC::INTERNAL;
     }
   }
+
+  // create filter statement in `where` statement
+  FilterStmt *filter_stmt = new FilterStmt();
+  if(select_sql.conditions != nullptr) {
+    Expression* temp = on_conditions;
+    on_conditions = new ConjunctionExpr(ConjunctionExpr::Type::AND, select_sql.conditions, temp);
+  }
+
+  filter_stmt->create(on_conditions, default_table, db);
+
 
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();

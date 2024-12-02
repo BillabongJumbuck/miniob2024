@@ -244,6 +244,7 @@ RC ComparisonExpr::try_get_value(Value &cell) const
     ValueExpr *  right_value_expr = static_cast<ValueExpr *>(right_.get());
     const Value &left_cell        = left_value_expr->get_value();
     const Value &right_cell       = right_value_expr->get_value();
+
     bool value = false;
     RC   rc    = compare_value(left_cell, right_cell, value);
     if (rc != RC::SUCCESS) {
@@ -261,6 +262,7 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 {
   Value left_value;
   Value right_value;
+
   RC rc = left_->get_value(tuple, left_value);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));

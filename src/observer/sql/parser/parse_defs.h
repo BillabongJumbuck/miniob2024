@@ -40,6 +40,16 @@ struct RelAttrSqlNode
 };
 
 /**
+ * @brief 描述一个inner join语句
+ * @ingroup SQLParser
+ */
+struct InnerJoinSqlNode
+{
+  std::vector<std::string> tables;
+  std::vector<Expression*> conditions;
+};
+
+/**
  * @brief 描述比较运算符
  * @ingroup SQLParser
  */
@@ -97,7 +107,7 @@ struct ConditionSqlNode
 struct SelectSqlNode
 {
   std::vector<std::unique_ptr<Expression>> expressions;  ///< 查询的表达式
-  std::vector<std::string>                 relations;    ///< 查询的表
+  std::vector<InnerJoinSqlNode>            relations;    ///< 查询的表
   Expression*                              conditions = nullptr;   ///< 查询条件
   std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
 };

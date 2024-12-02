@@ -196,6 +196,9 @@ RC LogicalPlanGenerator::traversal(ConjunctionExpr *expr, Table *default_table, 
       LOG_WARN("failed to traversal left expression. rc=%s", strrc(rc));
       return rc;
     }
+  }
+  else if(left->type() == ExprType::VALUE) {
+
   }else {
     LOG_ERROR("unexpected expression type: %s", left->type());
     rc = RC::INTERNAL;
@@ -213,6 +216,8 @@ RC LogicalPlanGenerator::traversal(ConjunctionExpr *expr, Table *default_table, 
       LOG_WARN("failed to traversal right expression. rc=%s", strrc(rc));
       return rc;
     }
+  }else if(left->type() == ExprType::VALUE) {
+
   }else {
     LOG_ERROR("unexpected expression type: %s", right->type());
     rc = RC::INTERNAL;
