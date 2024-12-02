@@ -49,6 +49,11 @@ RC UpdatePhysicalOperator::open(Trx *trx)
 
   child->close();
 
+  if(records_.empty()) {
+    LOG_WARN("no record to update!");
+    return RC::SUCCESS;
+  }
+
   if(field_metas_.size() != values_.size()) {
     LOG_WARN("field_metas size is not equal to values size!");
     return RC::INVALID_ARGUMENT;
@@ -82,10 +87,10 @@ RC UpdatePhysicalOperator::open(Trx *trx)
         LOG_WARN("subquery result size is not 1!");
         return RC::INVALID_ARGUMENT;
       }else if(subquery_expr->get_result_vector().empty()) {
-        // if(!field_metas_[i]->is_nullable()) {
-        //   LOG_WARN("subquery result is empty but field is not nullable!");
-        //   return RC::SUCCESS;
-        // }
+        if(!field_metas_[i]->is_nullable()) {
+          LOG_WARN("subquery result is empty but field is not nullable!");
+          return RC::SUCCESS;
+        }
         value.set_null();
       }else  {
         value = subquery_expr->get_result_vector()[0];
