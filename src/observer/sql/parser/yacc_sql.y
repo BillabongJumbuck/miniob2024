@@ -622,7 +622,9 @@ expression_list:
       } else {
         $$ = new std::vector<std::unique_ptr<Expression>>;
       }
-      $1 -> set_alias($2);
+      if($2 != nullptr){
+        $1 -> set_alias($2);
+      }
       $$->emplace($$->begin(), $1);
     }
     ;
