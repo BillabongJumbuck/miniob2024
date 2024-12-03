@@ -89,11 +89,15 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       }else if(subquery_expr->get_result_vector().empty()) {
         if(!field_metas_[i]->is_nullable()) {
           LOG_WARN("subquery result is empty but field is not nullable!");
-          return RC::SUCCESS;
+          return RC::INVALID_ARGUMENT;
         }
         value.set_null();
       }else  {
         value = subquery_expr->get_result_vector()[0];
+        if(value.is_null() && !field_metas_[i]->is_nullable()) {
+          LOG_WARN("subquery result is null but field is not nullable!");
+          return RC::INVALID_ARGUMENT; // 修改这里，直接返回错误
+        }
       }
     }else {
       LOG_WARN("value type is not VALUE or SUBQUERY!");
