@@ -51,7 +51,8 @@ enum class ExprType
   ARITHMETIC,   ///< 算术运算
   AGGREGATION,  ///< 聚合运算
   SUBQUERY,     ///< 子查询
-  VALUELIST     ///< 多个值的列表
+  VALUELIST,    ///< 多个值的列表
+  FUNCTION      ///< 函数
 };
 
 /**
@@ -127,6 +128,11 @@ public:
    */
   virtual RC eval(Chunk &chunk, std::vector<uint8_t> &select) { return RC::UNIMPLEMENTED; }
 
+  /**设置和获取alias
+   *
+   */
+  void set_alias(std::string alias) { alias_ = std::move(alias); }
+  string get_alias() { return alias_; }
 protected:
   /**
    * @brief 表达式在下层算子返回的 chunk 中的位置
@@ -138,6 +144,7 @@ protected:
 
 private:
   std::string name_;
+  std::string alias_;
 };
 
 class StarExpr : public Expression
@@ -533,4 +540,32 @@ public:
   std::vector<Value>& get_value_list() { return value_list_; }
 private:
   std::vector<Value> value_list_;
+};
+
+class FuncExpr : public Expression
+{
+public:
+  enum FuncType
+  {
+    LENGTH,
+    ROUND,
+    DATE_FORMAT
+  };
+
+  FuncExpr() = default;
+  FuncExpr(FuncType func_type, std::vector<std::unique_ptr<Expression>>& child);
+  virtual ~FuncExpr() = default;
+
+  AttrType value_type() const override;
+
+  ExprType type() const override { return ExprType::FUNCTION; }
+
+  RC get_value(const Tuple &tuple, Value &value) const override;
+private:
+  RC get_length_value(const Tuple &tuple, Value &value) const;
+  RC get_round_value(const Tuple &tuple, Value &value) const;
+  RC get_date_format_value(const Tuple &tuple, Value &value) const;
+private:
+  FuncType func_type_;
+  std::vector<std::unique_ptr<Expression>> child_;
 };

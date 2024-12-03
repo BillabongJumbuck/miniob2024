@@ -42,6 +42,9 @@ RC ProjectPhysicalOperator::open(Trx *trx)
 
 RC ProjectPhysicalOperator::next()
 {
+  if(children_.empty() && !expressions_.empty()) {
+    return RC::SELECT_NO_TABLE;
+  }
   if (children_.empty()) {
     return RC::RECORD_EOF;
   }

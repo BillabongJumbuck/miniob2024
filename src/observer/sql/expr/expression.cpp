@@ -971,12 +971,78 @@ RC ValueListExpr::get_value(const Tuple &tuple, Value &value) const {
   return RC::SUCCESS;
 }
 
-AttrType ValueListExpr::value_type() const{
-  if(this->value_list_.size() == 0) {
-      return AttrType::UNDEFINED;
+AttrType ValueListExpr::value_type() const
+{
+  if (this->value_list_.size() == 0) {
+    return AttrType::UNDEFINED;
   }else{
     return this->value_list_[0].attr_type();
   }
 }
+
+FuncExpr::FuncExpr(FuncType func_type, std::vector<std::unique_ptr<Expression>> &child){
+  func_type_ = func_type;
+  child_ = std::move(child);
+}
+
+AttrType FuncExpr::value_type() const{
+  switch (func_type_) {
+    case FuncExpr::LENGTH:
+      return AttrType::INTS;
+    case FuncExpr::ROUND: return AttrType::FLOATS;
+    case FuncType::DATE_FORMAT:
+      return AttrType::CHARS;
+    default:
+      return AttrType::UNDEFINED;
+  }
+}
+
+RC FuncExpr::get_value(const Tuple &tuple, Value &value) const{
+  RC rc = RC::SUCCESS;
+  switch (func_type_) {
+  case LENGTH: {
+    rc = get_length_value(tuple, value);
+    break;
+  }
+  case ROUND: {
+    rc = get_round_value(tuple, value);
+    break;
+  }
+  case DATE_FORMAT: {
+    rc = get_date_format_value(tuple, value);
+    break;
+  }
+  default: break;
+  }
+  return rc;
+}
+
+RC FuncExpr::get_length_value(const Tuple &tuple, Value &value) const{
+  RC rc = RC::SUCCESS;
+  auto &child = child_.front();
+  Value value_temp;
+  rc = child->get_value(tuple, value_temp);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of child expression. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  if(value_temp.attr_type() != AttrType::CHARS) {
+    LOG_WARN("invalid type of child expression. type=%d", value_temp.attr_type());
+    return RC::INVALID_ARGUMENT;
+  }
+  value = Value(static_cast<int>(strlen(value_temp.data())));
+  return RC::SUCCESS;
+}
+
+RC FuncExpr::get_round_value(const Tuple &tuple, Value &value) const{
+  return RC::UNIMPLEMENTED;
+}
+
+
+RC FuncExpr::get_date_format_value(const Tuple &tuple, Value &value) const{
+  return RC::UNIMPLEMENTED;
+}
+
 
 

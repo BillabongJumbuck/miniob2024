@@ -46,6 +46,8 @@ public:
   RC                 return_code() const { return return_code_; }
   const std::string &state_string() const { return state_string_; }
 
+  std::unique_ptr<PhysicalOperator>& operator_ref() { return operator_; }
+
   RC open();
   RC close();
   RC next_tuple(Tuple *&tuple);

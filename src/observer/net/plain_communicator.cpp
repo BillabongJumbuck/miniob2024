@@ -20,6 +20,8 @@ See the Mulan PSL v2 for more details. */
 #include "session/session.h"
 #include "sql/expr/tuple.h"
 
+#include <sql/operator/project_physical_operator.h>
+
 PlainCommunicator::PlainCommunicator()
 {
   send_message_delimiter_.assign(1, '\0');
@@ -330,6 +332,57 @@ RC PlainCommunicator::write_tuple_result(SqlResult *sql_result)
       return rc;
     }
   }
+
+  if(rc == RC::SELECT_NO_TABLE) {
+    // 没有from的select语句
+    rc = RC::SUCCESS;
+    is_empty = false;
+    auto& oper = sql_result->operator_ref();
+    auto proj_oper = dynamic_cast<ProjectPhysicalOperator*>(oper.get());
+    auto &exprs = proj_oper->expressions();
+    int cell_num = exprs.size();
+    for (int i = 0; i < cell_num; i++) {
+      if (i != 0) {
+        const char *delim = " | ";
+
+        rc = writer_->writen(delim, strlen(delim));
+        if (OB_FAIL(rc)) {
+          LOG_WARN("failed to send data to client. err=%s", strerror(errno));
+          sql_result->close();
+          return rc;
+        }
+      }
+
+      Value value;
+      Tuple* tuple_temp = new RowTuple();
+      exprs[i]->get_value(*tuple_temp, value);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get tuple cell value. rc=%s", strrc(rc));
+        sql_result->close();
+        return rc;
+      }
+
+      string cell_str = value.to_string();
+
+      rc = writer_->writen(cell_str.data(), cell_str.size());
+      if (OB_FAIL(rc)) {
+        LOG_WARN("failed to send data to client. err=%s", strerror(errno));
+        sql_result->close();
+        return rc;
+      }
+    }
+
+    char newline = '\n';
+
+    rc = writer_->writen(&newline, 1);
+    if (OB_FAIL(rc)) {
+      LOG_WARN("failed to send data to client. err=%s", strerror(errno));
+      sql_result->close();
+      return rc;
+    }
+    return RC::SUCCESS;
+  }
+
   if (rc == RC::RECORD_EOF) {
     return  RC::SUCCESS;
   }

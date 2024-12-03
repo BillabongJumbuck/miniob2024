@@ -92,6 +92,10 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
       ASSERT(false, "shouldn't be here");
     } break;
 
+    case ExprType::FUNCTION: {
+      return bind_function_expression(expr, bound_expressions);
+    } break;
+
     default: {
       LOG_WARN("unknown expression type: %d", static_cast<int>(expr->type()));
       return RC::INTERNAL;
@@ -378,6 +382,18 @@ RC ExpressionBinder::bind_arithmetic_expression(
   bound_expressions.emplace_back(std::move(expr));
   return RC::SUCCESS;
 }
+
+RC ExpressionBinder::bind_function_expression(
+    std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &bound_expressions){
+    if(nullptr == expr) {
+      return RC::SUCCESS;
+    }
+
+  bound_expressions.emplace_back(std::move(expr));
+  return RC::SUCCESS;
+
+}
+
 
 RC check_aggregate_expression(AggregateExpr &expression)
 {

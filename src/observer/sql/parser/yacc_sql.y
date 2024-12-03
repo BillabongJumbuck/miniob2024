@@ -126,6 +126,10 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         IN_OP
         EXISTS_OP
         UNIQUE
+        LENGTH
+        ROUND
+        DATE_FORMAT
+        AS
 
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
@@ -181,7 +185,10 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <expression>          aggr_func_expr
 %type <expression>          sub_query_expr
 %type <expression>          value_list_expr
+%type <expression>          func_expr
+%type <number>              func_type
 %type <value_list>          value_list_ssq
+%type <string>              alias
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
 %type <update_item_ptr>     update_item;
@@ -559,7 +566,15 @@ update_item:
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM from_list where group_by
+    SELECT expression_list
+    {
+      $$ = new ParsedSqlNode(SCF_SELECT);
+      if ($2 != nullptr) {
+        $$->selection.expressions.swap(*$2);
+        delete $2;
+      }
+    }
+    | SELECT expression_list FROM from_list where group_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -592,21 +607,38 @@ calc_stmt:
     ;
 
 expression_list:
-    expression
+    expression alias
     {
       $$ = new std::vector<std::unique_ptr<Expression>>;
+      if($2 != nullptr){
+        $1 -> set_alias($2);
+      }
       $$->emplace_back($1);
     }
-    | expression COMMA expression_list
+    | expression alias COMMA expression_list
     {
-      if ($3 != nullptr) {
-        $$ = $3;
+      if ($4 != nullptr) {
+        $$ = $4;
       } else {
         $$ = new std::vector<std::unique_ptr<Expression>>;
       }
+      $1 -> set_alias($2);
       $$->emplace($$->begin(), $1);
     }
     ;
+
+alias:
+    /* empty */ {
+      $$ = nullptr;
+    }
+    | ID {
+      $$ = $1;
+    }
+    | AS ID {
+      $$ = $2;
+    }
+    ;
+
 expression:
     expression '+' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
@@ -640,6 +672,9 @@ expression:
     }
     | '*' {
       $$ = new StarExpr();
+    }
+    | func_expr {
+      $$ = $1; // FuncExpr
     }
     | aggr_func_expr {
       $$ = $1; // AggrFuncExpr
@@ -704,6 +739,27 @@ value_list_ssq:
       }
       $$->emplace_back(*$2);
       delete $2;
+    }
+    ;
+
+func_expr:
+    func_type LBRACE expression_list RBRACE
+    {
+      $$ = new FuncExpr((FuncExpr::FuncType)$1,*$3);
+      $$->set_name(token_name(sql_string, &@$));
+      delete $3;
+    }
+    ;
+
+func_type:
+    LENGTH {
+      $$ = FuncExpr::FuncType::LENGTH;
+    }
+    | ROUND {
+      $$ = FuncExpr::FuncType::ROUND;
+    }
+    | DATE_FORMAT {
+      $$ = FuncExpr::FuncType::DATE_FORMAT;
     }
     ;
 

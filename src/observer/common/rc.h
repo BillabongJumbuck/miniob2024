@@ -77,7 +77,8 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(LOG_FILE_FULL)               \
   DEFINE_RC(LOG_ENTRY_INVALID)           \
   DEFINE_RC(UNSUPPORTED)                 \
-  DEFINE_RC(ERROR_IN_SSQ)
+  DEFINE_RC(ERROR_IN_SSQ)                \
+  DEFINE_RC(SELECT_NO_TABLE)
 
 enum class RC
 {
