@@ -33,6 +33,7 @@ class Expression;
 class ConjunctionExpr;
 class ComparisonExpr;
 class ArithmeticExpr;
+class FuncExpr;
 class Table;
 class Db;
 
@@ -60,4 +61,5 @@ private:
   static RC traversal(ConjunctionExpr *expr, Table *default_table, Db *db);
   static RC comparison_process(ComparisonExpr *expr, Table *default_table, Db *db);
   static RC arithmetic_process(ArithmeticExpr *expr, Table *default_table, Db *db);
+  static RC func_expr_process(FuncExpr *expr, Table *default_table, Db *db);
 };

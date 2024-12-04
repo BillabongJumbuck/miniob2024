@@ -22,8 +22,8 @@ See the Mulan PSL v2 for more details. */
 
 #include <utility>
 #include <sql/optimizer/logical_plan_generator.h>
-#include <sql/optimizer/physical_plan_generator.h>
 #include <sql/stmt/select_stmt.h>
+#include <cmath>
 
 
 using namespace std;
@@ -1036,6 +1036,51 @@ RC FuncExpr::get_length_value(const Tuple &tuple, Value &value) const{
 }
 
 RC FuncExpr::get_round_value(const Tuple &tuple, Value &value) const{
+  RC rc = RC::SUCCESS;
+  switch (child_.size()) {
+  case 1:
+    {
+      Value value_temp;
+      rc = child_.front()->get_value(tuple, value_temp);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get value of child expression. rc=%s", strrc(rc));
+        return rc;
+      }
+      if(value_temp.attr_type() != AttrType::FLOATS) {
+        LOG_WARN("invalid type of child expression. type=%d", value_temp.attr_type());
+      }
+      double val = value_temp.get_float();
+      value = Value(static_cast<float>(std::round(val)));
+      return RC::SUCCESS;
+    }break;
+  case 2:
+    {
+      Value value_temp;
+      rc = child_[0]->get_value(tuple, value_temp);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get value of child expression. rc=%s", strrc(rc));
+        return rc;
+      }
+      if(value_temp.attr_type() != AttrType::FLOATS) {
+        LOG_WARN("invalid type of child expression. type=%d", value_temp.attr_type());
+      }
+      double val = value_temp.get_float();
+
+      Value value_temp2;
+      rc = child_[1]->get_value(tuple, value_temp2);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get value of child expression. rc=%s", strrc(rc));
+        return rc;
+      }
+      if(value_temp2.attr_type() != AttrType::INTS) {
+        LOG_WARN("invalid type of child expression. type=%d", value_temp2.attr_type());
+      }
+      int precision = value_temp2.get_int();
+      value = Value(static_cast<float>(std::round(val * std::pow(10, precision)) / std::pow(10, precision)));
+      return RC::SUCCESS;
+    }break;
+    default: break;
+  }
   return RC::UNIMPLEMENTED;
 }
 

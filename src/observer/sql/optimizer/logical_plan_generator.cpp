@@ -263,6 +263,13 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
       LOG_WARN("failed to process subquery expression. rc=%s", strrc(rc));
       return rc;
     }
+  }else if(left_child-> type() == ExprType::FUNCTION) {
+    rc = func_expr_process(dynamic_cast<FuncExpr*>(left_child.get()), default_table, db);
+    // 判断rc
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to process fucntion expression. rc=%s", strrc(rc));
+      return rc;
+    }
   }
 
   // Expression *right_child = expr->right().get();
@@ -295,6 +302,13 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
     // 判断rc
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to process subquery expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  }else if(right_child-> type() == ExprType::FUNCTION) {
+    rc = func_expr_process(dynamic_cast<FuncExpr*>(right_child.get()), default_table, db);
+    // 判断rc
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to process fucntion expression. rc=%s", strrc(rc));
       return rc;
     }
   }
@@ -381,6 +395,13 @@ RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default
       LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
       return rc;
     }
+  }else if(left_child-> type() == ExprType::FUNCTION) {
+    rc = func_expr_process(dynamic_cast<FuncExpr*>(left_child.get()), default_table, db);
+    // 判断rc
+    if(OB_FAIL(rc)) {
+      LOG_WARN("failed to process fucntion expression. rc=%s", strrc(rc));
+      return rc;
+    }
   }
 
   // 处理右子表达式
@@ -407,6 +428,13 @@ RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default
       // 判断rc
       if(OB_FAIL(rc)) {
         LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
+        return rc;
+      }
+    }else if(right_child-> type() == ExprType::FUNCTION) {
+      rc = func_expr_process(dynamic_cast<FuncExpr*>(right_child.get()), default_table, db);
+      // 判断rc
+      if(OB_FAIL(rc)) {
+        LOG_WARN("failed to process fucntion expression. rc=%s", strrc(rc));
         return rc;
       }
     }
@@ -458,6 +486,32 @@ RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default
 
   return rc;
 }
+
+RC LogicalPlanGenerator::func_expr_process(FuncExpr *expr, Table *default_table, Db *db){
+  RC rc = RC::SUCCESS;
+
+  for (int i = 0; i < expr->get_child().size(); i++) {
+    std::unique_ptr<Expression> child = std::move(expr->get_child()[i]);
+    if (child->type() == ExprType::UNBOUND_FIELD) {
+      UnboundFieldExpr* unbound_expr = dynamic_cast<UnboundFieldExpr*>(child.get());
+      Table *table;
+      if(unbound_expr->table_name() == nullptr || unbound_expr->table_name()[0] == '\0') {
+        table = default_table;
+      }else {
+        table = db->find_table(unbound_expr->table_name());
+      }
+      const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
+      // field不存在，返回错误
+      if(field_meta == nullptr) {
+        LOG_WARN("field not found: %s", unbound_expr->field_name());
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+      expr->get_child()[i] = std::make_unique<FieldExpr>(table, field_meta);
+    }
+  }
+  return rc;
+}
+
 
 int LogicalPlanGenerator::implicit_cast_cost(AttrType from, AttrType to)
 {
