@@ -519,6 +519,7 @@ public:
 
   RC Create_stmt(Db *db);
   RC LogicalPlanGenerate();
+  RC add_table_map(std::unordered_map<std::string, Table*> &table_map);
 
 private:
 

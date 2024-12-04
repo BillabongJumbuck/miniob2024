@@ -956,6 +956,13 @@ RC SubQueryExpr::LogicalPlanGenerate(){
   return RC::SUCCESS;
 }
 
+RC SubQueryExpr::add_table_map(std::unordered_map<std::string, Table*> &table_map)
+{
+  auto select_stmt = dynamic_cast<SelectStmt*>(this->select_stmt_);
+  select_stmt->add_table_map(table_map);
+  return RC::SUCCESS;
+}
+
 //////////////////////////////////////////////////////////////////////////////
 ValueListExpr::ValueListExpr()
 {
@@ -980,6 +987,7 @@ AttrType ValueListExpr::value_type() const
   }
 }
 
+///////////////////////////////////////////////////////////////////////////////
 FuncExpr::FuncExpr(FuncType func_type, std::vector<std::unique_ptr<Expression>> &child){
   func_type_ = func_type;
   child_ = std::move(child);
