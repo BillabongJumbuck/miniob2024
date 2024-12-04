@@ -150,6 +150,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<InnerJoinSqlNode> *            join_list;
   std::vector<std::string> *                 relation_list;
   InnerJoinSqlNode *                         join;
+  TableWithAlias *                           alias;
   char *                                     string;
   int                                        number;
   float                                      floats;
@@ -179,6 +180,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <condition>           where
 %type <string>              storage_format
 %type <relation_list>       rel_list
+%type <alias>               relation_with_alias
 %type <join_list>           from_list
 %type <join>                join_list
 %type <expression>          expression
@@ -803,15 +805,28 @@ rel_list:
     }
     ;
 
+relation_with_alias:
+    relation alias{
+        $$ = new TableWithAlias;
+        $$->table_name = $1;
+        if($2 != nullptr){
+            $$->alias = $2;
+        }
+        else
+        {
+            $$->alias = "";
+        }
+    };
+
 join_list:
-    relation{
+    relation_with_alias {
       $$ = new InnerJoinSqlNode;
-      $$->tables.push_back($1);
+      $$->tables.push_back(*$1);
     }
-    | join_list INNER JOIN relation ON condition
+    | join_list INNER JOIN relation_with_alias ON condition
     {
       $$ = $1;
-      $$->tables.push_back($4);
+      $$->tables.push_back(*$4);
       $$->conditions.push_back($6);
     }
     ;

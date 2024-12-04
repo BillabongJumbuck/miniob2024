@@ -46,14 +46,14 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   unordered_map<string, Table *> table_map;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     for(size_t j=0; j < select_sql.relations[i].tables.size();j++) {
-      const char *table_name = select_sql.relations[i].tables[j].c_str();
+      const char *table_name = select_sql.relations[i].tables[j].table_name.c_str();
       if(table_name == nullptr){
         LOG_WARN("invalid argument. table name is null. index=%d", j);
         return RC::INVALID_ARGUMENT;
       }
       Table *table = db->find_table(table_name);
       if (nullptr == table) {
-        LOG_WARN("no such table. db=%s, table_name=%s", db->name(), select_sql.relations[i].tables[j].c_str());
+        LOG_WARN("no such table. db=%s, table_name=%s", db->name(), select_sql.relations[i].tables[j].table_name.c_str());
         return RC::SCHEMA_TABLE_NOT_EXIST;
       }
 
@@ -62,6 +62,11 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
         binder_context.add_table(table);
         tables.push_back(table);
         table_map.insert({table_name, table});
+        if(!select_sql.relations[i].tables[j].alias.empty()) {
+          const char *alias = select_sql.relations[i].tables[j].alias.c_str();
+          binder_context.add_table(table, alias);
+          table_map.insert({alias, table});
+        }
       }
     }
   }
@@ -117,6 +122,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->tables_.swap(tables);
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
+  select_stmt->table_map_ = table_map;
   select_stmt->group_by_.swap(group_by_expressions);
   stmt                      = select_stmt;
   return RC::SUCCESS;

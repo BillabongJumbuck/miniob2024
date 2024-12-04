@@ -152,12 +152,13 @@ union YYSTYPE
   std::vector<InnerJoinSqlNode> *            join_list;
   std::vector<std::string> *                 relation_list;
   InnerJoinSqlNode *                         join;
+  TableWithAlias *                           alias;
   char *                                     string;
   int                                        number;
   float                                      floats;
   bool                                       boolean;
 
-#line 161 "yacc_sql.hpp"
+#line 162 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

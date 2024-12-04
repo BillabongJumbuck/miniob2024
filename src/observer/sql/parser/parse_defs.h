@@ -40,12 +40,22 @@ struct RelAttrSqlNode
 };
 
 /**
+ *@brief 描述一个带alias的表
+ *@ingroup SQLParser
+ */
+struct TableWithAlias
+{
+  std::string table_name;
+  std::string alias;
+};
+
+/**
  * @brief 描述一个inner join语句
  * @ingroup SQLParser
  */
 struct InnerJoinSqlNode
 {
-  std::vector<std::string> tables;
+  std::vector<TableWithAlias> tables;
   std::vector<Expression*> conditions;
 };
 

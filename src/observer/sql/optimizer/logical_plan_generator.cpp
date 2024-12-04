@@ -118,7 +118,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   unique_ptr<LogicalOperator> predicate_oper;
 
-  RC rc = create_plan(select_stmt->filter_stmt(), predicate_oper);
+  RC rc = create_plan(select_stmt->filter_stmt(), predicate_oper, select_stmt->table_map());
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
     return rc;
@@ -156,14 +156,14 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   return RC::SUCCESS;
 }
 
-RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<LogicalOperator> &logical_operator)
+RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<LogicalOperator> &logical_operator, std::unordered_map<std::string, Table *> &table_map)
 {
   RC                                  rc = RC::SUCCESS;
 
   unique_ptr<PredicateLogicalOperator> predicate_oper;
   if(filter_stmt != nullptr) {
     ConjunctionExpr* conjunction_expr = filter_stmt->conjunction();
-    rc = traversal(conjunction_expr, filter_stmt->table(), filter_stmt->db());
+    rc = traversal(conjunction_expr, filter_stmt->table(), filter_stmt->db(), table_map);
     if (OB_FAIL(rc)) {
       LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
       return rc;
@@ -177,7 +177,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   return rc;
 }
 
-RC LogicalPlanGenerator::traversal(ConjunctionExpr *expr, Table *default_table, Db *db)
+RC LogicalPlanGenerator::traversal(ConjunctionExpr *expr, Table *default_table, Db *db, std::unordered_map<std::string, Table *> &table_map)
 {
   RC rc = RC::SUCCESS;
   // 获取左右表达式
@@ -185,13 +185,13 @@ RC LogicalPlanGenerator::traversal(ConjunctionExpr *expr, Table *default_table, 
   Expression *right = expr->right().get();
 
   if(left->type() == ExprType::CONJUNCTION) {
-    rc = traversal(dynamic_cast<ConjunctionExpr*>(left), default_table, db);
+    rc = traversal(dynamic_cast<ConjunctionExpr*>(left), default_table, db, table_map);
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to traversal left expression. rc=%s", strrc(rc));
       return rc;
     }
   }else if(left->type() == ExprType::COMPARISON ) {
-     rc = comparison_process(dynamic_cast<ComparisonExpr*>(left), default_table, db);
+     rc = comparison_process(dynamic_cast<ComparisonExpr*>(left), default_table, db, table_map);
      if(OB_FAIL(rc)) {
       LOG_WARN("failed to traversal left expression. rc=%s", strrc(rc));
       return rc;
@@ -205,13 +205,13 @@ RC LogicalPlanGenerator::traversal(ConjunctionExpr *expr, Table *default_table, 
   }
 
   if(right->type() == ExprType::CONJUNCTION) {
-    rc = traversal(dynamic_cast<ConjunctionExpr*>(right), default_table, db);
+    rc = traversal(dynamic_cast<ConjunctionExpr*>(right), default_table, db, table_map);
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to traversal right expression. rc=%s", strrc(rc));
       return rc;
     }
   }else if(right->type() == ExprType::COMPARISON) {
-    rc = comparison_process(dynamic_cast<ComparisonExpr*>(right), default_table, db);
+    rc = comparison_process(dynamic_cast<ComparisonExpr*>(right), default_table, db, table_map);
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to traversal right expression. rc=%s", strrc(rc));
       return rc;
@@ -225,7 +225,7 @@ RC LogicalPlanGenerator::traversal(ConjunctionExpr *expr, Table *default_table, 
   return rc;
 }
 
-RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default_table, Db *db)
+RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default_table, Db *db, std::unordered_map<std::string, Table *> &table_map)
 {
   RC rc = RC::SUCCESS;
 
@@ -239,7 +239,7 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
     if(unbound_expr->table_name() == nullptr || unbound_expr->table_name()[0] == '\0') {
       table = default_table;
     }else {
-      table = db->find_table(unbound_expr->table_name());
+      table = table_map[unbound_expr->table_name()];
     }
     const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
     // field不存在，返回错误
@@ -249,7 +249,7 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
     }
     left_child = std::make_unique<FieldExpr>(table, field_meta);
   }else if (left_child-> type() == ExprType::ARITHMETIC) {
-    rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(left_child.get()), default_table, db);
+    rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(left_child.get()), default_table, db, table_map);
     // 判断rc
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
@@ -264,7 +264,7 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
       return rc;
     }
   }else if(left_child-> type() == ExprType::FUNCTION) {
-    rc = func_expr_process(dynamic_cast<FuncExpr*>(left_child.get()), default_table, db);
+    rc = func_expr_process(dynamic_cast<FuncExpr*>(left_child.get()), default_table, db, table_map);
     // 判断rc
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to process fucntion expression. rc=%s", strrc(rc));
@@ -280,7 +280,7 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
     if(unbound_expr->table_name() == nullptr || unbound_expr->table_name()[0] == '\0') {
       table = default_table;
     }else {
-      table = db->find_table(unbound_expr->table_name());
+      table = table_map[unbound_expr->table_name()];
     }
     const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
     // field不存在，返回错误
@@ -290,7 +290,7 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
     }
     right_child = std::make_unique<FieldExpr>(table, field_meta);
   }else if (right_child-> type() == ExprType::ARITHMETIC) {
-    rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(right_child.get()), default_table, db);
+    rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(right_child.get()), default_table, db, table_map);
     // 判断rc
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
@@ -305,7 +305,7 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
       return rc;
     }
   }else if(right_child-> type() == ExprType::FUNCTION) {
-    rc = func_expr_process(dynamic_cast<FuncExpr*>(right_child.get()), default_table, db);
+    rc = func_expr_process(dynamic_cast<FuncExpr*>(right_child.get()), default_table, db, table_map);
     // 判断rc
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to process fucntion expression. rc=%s", strrc(rc));
@@ -367,7 +367,8 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
   return rc;
 }
 
-RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default_table, Db *db) {
+RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default_table, Db *db, std::unordered_map<std::string, Table *> &table_map)
+{
   RC rc = RC::SUCCESS;
 
   // Expression *left_child = expr->left().get();
@@ -379,7 +380,7 @@ RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default
     if(unbound_expr->table_name() == nullptr || unbound_expr->table_name()[0] == '\0') {
       table = default_table;
     }else {
-      table = db->find_table(unbound_expr->table_name());
+      table = table_map[unbound_expr->table_name()];
     }
     const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
     // field不存在，返回错误
@@ -389,14 +390,14 @@ RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default
     }
     left_child = std::make_unique<FieldExpr>(table, field_meta);
   }else if (left_child-> type() == ExprType::ARITHMETIC) {
-    rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(left_child.get()), default_table, db);
+    rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(left_child.get()), default_table, db, table_map);
     // 判断rc
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
       return rc;
     }
   }else if(left_child-> type() == ExprType::FUNCTION) {
-    rc = func_expr_process(dynamic_cast<FuncExpr*>(left_child.get()), default_table, db);
+    rc = func_expr_process(dynamic_cast<FuncExpr*>(left_child.get()), default_table, db, table_map);
     // 判断rc
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to process fucntion expression. rc=%s", strrc(rc));
@@ -414,7 +415,7 @@ RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default
       if(unbound_expr->table_name() == nullptr || unbound_expr->table_name()[0] == '\0') {
         table = default_table;
       }else {
-        table = db->find_table(unbound_expr->table_name());
+        table = table_map[unbound_expr->table_name()];
       }
       const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
       // field不存在，返回错误
@@ -424,14 +425,14 @@ RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default
       }
       right_child = std::make_unique<FieldExpr>(table, field_meta);
     }else if (right_child-> type() == ExprType::ARITHMETIC) {
-      rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(right_child.get()), default_table, db);
+      rc = arithmetic_process(dynamic_cast<ArithmeticExpr*>(right_child.get()), default_table, db, table_map);
       // 判断rc
       if(OB_FAIL(rc)) {
         LOG_WARN("failed to process arithmetic expression. rc=%s", strrc(rc));
         return rc;
       }
     }else if(right_child-> type() == ExprType::FUNCTION) {
-      rc = func_expr_process(dynamic_cast<FuncExpr*>(right_child.get()), default_table, db);
+      rc = func_expr_process(dynamic_cast<FuncExpr*>(right_child.get()), default_table, db, table_map);
       // 判断rc
       if(OB_FAIL(rc)) {
         LOG_WARN("failed to process fucntion expression. rc=%s", strrc(rc));
@@ -487,7 +488,8 @@ RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default
   return rc;
 }
 
-RC LogicalPlanGenerator::func_expr_process(FuncExpr *expr, Table *default_table, Db *db){
+RC LogicalPlanGenerator::func_expr_process(FuncExpr *expr, Table *default_table, Db *db, std::unordered_map<std::string, Table *> &table_map)
+{
   RC rc = RC::SUCCESS;
 
   for (int i = 0; i < expr->get_child().size(); i++) {
@@ -498,7 +500,7 @@ RC LogicalPlanGenerator::func_expr_process(FuncExpr *expr, Table *default_table,
       if(unbound_expr->table_name() == nullptr || unbound_expr->table_name()[0] == '\0') {
         table = default_table;
       }else {
-        table = db->find_table(unbound_expr->table_name());
+        table = table_map[unbound_expr->table_name()];
       }
       const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
       // field不存在，返回错误
@@ -539,7 +541,8 @@ RC LogicalPlanGenerator::create_plan(DeleteStmt *delete_stmt, unique_ptr<Logical
 
   unique_ptr<LogicalOperator> predicate_oper;
 
-  RC rc = create_plan(filter_stmt, predicate_oper);
+  std::unordered_map<std::string, Table *> table_map = {};
+  RC rc = create_plan(filter_stmt, predicate_oper, table_map);
   if (rc != RC::SUCCESS) {
     return rc;
   }
@@ -674,7 +677,8 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, std::unique_ptr<Lo
 
   unique_ptr<LogicalOperator> predicate_oper;
 
-  RC rc = create_plan(filter_stmt, predicate_oper);
+  std::unordered_map<std::string, Table *> table_map = {};
+  RC rc = create_plan(filter_stmt, predicate_oper, table_map);
   if (rc != RC::SUCCESS) {
     return rc;
   }

@@ -19,6 +19,8 @@ See the Mulan PSL v2 for more details. */
 #include "common/rc.h"
 #include "common/type/attr_type.h"
 
+#include <unordered_map>
+
 class Stmt;
 class CalcStmt;
 class SelectStmt;
@@ -49,6 +51,7 @@ private:
   static RC create_plan(CalcStmt *calc_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   static RC create_plan(SelectStmt *select_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   static RC create_plan(FilterStmt *filter_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
+  static RC create_plan(FilterStmt *filter_stmt, std::unique_ptr<LogicalOperator> &logical_operator, std::unordered_map<std::string, Table *> &table_map);
   static RC create_plan(InsertStmt *insert_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   static RC create_plan(DeleteStmt *delete_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   static RC create_plan(ExplainStmt *explain_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
@@ -58,8 +61,8 @@ private:
   static RC create_group_by_plan(SelectStmt *select_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
 
   static int implicit_cast_cost(AttrType from, AttrType to);
-  static RC traversal(ConjunctionExpr *expr, Table *default_table, Db *db);
-  static RC comparison_process(ComparisonExpr *expr, Table *default_table, Db *db);
-  static RC arithmetic_process(ArithmeticExpr *expr, Table *default_table, Db *db);
-  static RC func_expr_process(FuncExpr *expr, Table *default_table, Db *db);
+  static RC traversal(ConjunctionExpr *expr, Table *default_table, Db *db, std::unordered_map<std::string, Table *> &table_map);
+  static RC comparison_process(ComparisonExpr *expr, Table *default_table, Db *db, std::unordered_map<std::string, Table *> &table_map);
+  static RC arithmetic_process(ArithmeticExpr *expr, Table *default_table, Db *db, std::unordered_map<std::string, Table *> &table_map);
+  static RC func_expr_process(FuncExpr *expr, Table *default_table, Db *db, std::unordered_map<std::string, Table *> &table_map);
 };
