@@ -1086,7 +1086,70 @@ RC FuncExpr::get_round_value(const Tuple &tuple, Value &value) const{
 
 
 RC FuncExpr::get_date_format_value(const Tuple &tuple, Value &value) const{
-  return RC::UNIMPLEMENTED;
+  RC rc = RC::SUCCESS;
+  Value value_temp;
+  rc = child_.front()->get_value(tuple, value_temp);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of child expression. rc=%s", strrc(rc));
+    return rc;
+  }
+  if(value_temp.attr_type() != AttrType::DATES) {
+    if(value_temp.attr_type() == AttrType::CHARS) {
+      // 尝试转换为date
+      const char* temp = value_temp.data();
+      // 判断是否为日期格式
+      if(temp[4] != '-' || temp[7] != '-') {
+        return RC::INVALID_ARGUMENT;
+      }
+      int y, m ,d;
+      // 提取年份
+      y = (temp[0] - '0') * 1000 + (temp[1] - '0') * 100 + (temp[2] - '0') * 10 + (temp[3] - '0');
+
+      // 提取月份
+      m = (temp[5] - '0') * 10 + (temp[6] - '0');
+
+      // 提取日期
+      d = (temp[8] - '0') * 10 + (temp[9] - '0');
+      value_temp.set_date(y,m,d);
+    }else {
+      LOG_WARN("invalid type of child expression. type=%d", value_temp.attr_type());
+      return RC::INVALID_ARGUMENT;
+    }
+  }
+
+  Value format_value;
+  rc = child_[1]->get_value(tuple, format_value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of child expression. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  if(format_value.attr_type() != AttrType::CHARS) {
+    LOG_WARN("invalid type of child expression. type=%d", format_value.attr_type());
+    return RC::INVALID_ARGUMENT;
+  }
+  const char* format = format_value.data();
+  int y, m , d;
+  int date = value_temp.get_int();
+  y = date / 10000;
+  m = (date - y * 10000) / 100;
+  d = date - y * 10000 - m * 100;
+  stringstream ss;
+  for(int i = 0; i < format_value.length(); i++) {
+    if(format[i] == '%') {
+      continue;
+    }else if(format[i] == 'Y' || format[i] == 'y') {
+      ss << std::setw(4) << std::setfill('0') << y;
+    }else if(format[i] == 'M' || format[i] == 'm') {
+      ss << std::setw(2) << std::setfill('0') << m;
+    }else if(format[i] == 'D' || format[i] == 'd') {
+      ss << std::setw(2) << std::setfill('0') << d;
+    }else {
+      ss << format[i];
+    }
+  }
+  value = Value(ss.str().c_str());
+  return RC::SUCCESS;
 }
 
 
