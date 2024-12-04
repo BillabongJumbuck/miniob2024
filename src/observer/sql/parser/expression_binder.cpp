@@ -385,13 +385,35 @@ RC ExpressionBinder::bind_arithmetic_expression(
 
 RC ExpressionBinder::bind_function_expression(
     std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &bound_expressions){
-    if(nullptr == expr) {
-      return RC::SUCCESS;
+  if(nullptr == expr) {
+    return RC::SUCCESS;
+  }
+
+  auto func_expr = dynamic_cast<FuncExpr *>(expr.get());
+
+  vector<unique_ptr<Expression>> child_bound_expression;
+
+  for(auto &child_expr : func_expr->get_child()) {
+    RC rc = bind_expression(child_expr, child_bound_expression);
+    if(OB_FAIL(rc)) {
+      return rc;
     }
+
+    if(child_bound_expression.size() != 1) {
+      LOG_WARN("invalid children number of function expression: %d", child_bound_expression.size());
+      return RC::INVALID_ARGUMENT;
+    }
+
+    unique_ptr<Expression> &child = child_bound_expression[0];
+    if(child.get() != child_expr.get()) {
+      child_expr.reset(child.release());
+    }
+
+    child_bound_expression.clear();
+  }
 
   bound_expressions.emplace_back(std::move(expr));
   return RC::SUCCESS;
-
 }
 
 

@@ -131,7 +131,8 @@ public:
   /**设置和获取alias
    *
    */
-  void set_alias(std::string alias) { alias_ = std::move(alias); }
+  void set_alias(std::string alias) { alias_ = std::move(alias); has_alias_ = true;}
+  bool has_alias() { return has_alias_; }
   string get_alias() { return alias_; }
 protected:
   /**
@@ -144,6 +145,7 @@ protected:
 
 private:
   std::string name_;
+  bool has_alias_ = false;
   std::string alias_;
 };
 
@@ -561,6 +563,9 @@ public:
   ExprType type() const override { return ExprType::FUNCTION; }
 
   RC get_value(const Tuple &tuple, Value &value) const override;
+
+  FuncType func_type() const { return func_type_; }
+  std::vector<std::unique_ptr<Expression>>& get_child() { return child_; }
 private:
   RC get_length_value(const Tuple &tuple, Value &value) const;
   RC get_round_value(const Tuple &tuple, Value &value) const;
