@@ -1050,7 +1050,7 @@ RC FuncExpr::get_round_value(const Tuple &tuple, Value &value) const{
         LOG_WARN("invalid type of child expression. type=%d", value_temp.attr_type());
       }
       double val = value_temp.get_float();
-      value = Value(static_cast<float>(std::round(val)));
+      value = Value(static_cast<int>(std::round(val)));
       return RC::SUCCESS;
     }break;
   case 2:
