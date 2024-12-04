@@ -1131,6 +1131,7 @@ RC FuncExpr::get_date_format_value(const Tuple &tuple, Value &value) const{
   const char* format = format_value.data();
   int y, m , d;
   int date = value_temp.get_int();
+  vector<std::string> months = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
   y = date / 10000;
   m = (date - y * 10000) / 100;
   d = date - y * 10000 - m * 100;
@@ -1138,12 +1139,26 @@ RC FuncExpr::get_date_format_value(const Tuple &tuple, Value &value) const{
   for(int i = 0; i < format_value.length(); i++) {
     if(format[i] == '%') {
       continue;
-    }else if(format[i] == 'Y' || format[i] == 'y') {
+    }else if(format[i] == 'Y') {
       ss << std::setw(4) << std::setfill('0') << y;
-    }else if(format[i] == 'M' || format[i] == 'm') {
+    }else if(format[i] == 'y') {
+      ss << std::setw(2) << std::setfill('0') << y % 100;
+    }else if(format[i] == 'm') {
       ss << std::setw(2) << std::setfill('0') << m;
-    }else if(format[i] == 'D' || format[i] == 'd') {
+    }else if(format[i] == 'M') {
+      ss << months[m - 1];
+    }else if(format[i] == 'd') {
       ss << std::setw(2) << std::setfill('0') << d;
+    }else if(format[i] == 'D') {
+      if(d == 1 || d == 21 || d == 31) {
+        ss << d << "st";
+      }else if(d == 2 || d == 22) {
+        ss << d << "nd";
+      }else if(d == 3 || d == 23) {
+        ss << d << "rd";
+      }else {
+        ss << d << "th";
+      }
     }else {
       ss << format[i];
     }
