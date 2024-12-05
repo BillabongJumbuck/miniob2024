@@ -25,6 +25,9 @@ See the Mulan PSL v2 for more details. */
 #include <sql/stmt/select_stmt.h>
 #include <cmath>
 
+#include "sql/optimizer/physical_plan_generator.h"
+class PhysicalOperator;
+class PhysicalPlanGenerator;
 
 using namespace std;
 
@@ -32,6 +35,17 @@ RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
 {
   return tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
 }
+
+RC FieldExpr::get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const
+{
+  RC rc = tuple1.cell_at(field().meta()->field_id(), value);
+  if(OB_FAIL(rc)) {
+    rc = tuple2.cell_at(field().meta()->field_id(), value);
+    return rc;
+  }
+  return rc;
+}
+
 
 bool FieldExpr::equal(const Expression &other) const
 {
@@ -75,6 +89,12 @@ RC ValueExpr::get_value(const Tuple &tuple, Value &value) const
   return RC::SUCCESS;
 }
 
+RC ValueExpr::get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const
+{
+  value = value_;
+  return RC::SUCCESS;
+}
+
 RC ValueExpr::get_column(Chunk &chunk, Column &column)
 {
   column.init(value_);
@@ -102,6 +122,17 @@ RC CastExpr::get_value(const Tuple &tuple, Value &result) const
 {
   Value value;
   RC rc = child_->get_value(tuple, value);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
+  return cast(value, result);
+}
+
+RC CastExpr::get_value(const Tuple &tuple1, const Tuple &tuple2, Value &result) const
+{
+  Value value;
+  RC rc = child_->get_value(tuple1, tuple2, value);
   if (rc != RC::SUCCESS) {
     return rc;
   }
@@ -292,6 +323,41 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
   }
   return rc;
 }
+
+RC ComparisonExpr::get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const{
+  Value left_value;
+  Value right_value;
+
+  RC rc = left_->get_value(tuple1, tuple2, left_value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+    return rc;
+  }
+  rc = right_->get_value(tuple1, tuple2, right_value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  bool bool_value = false;
+  if(left_->type() == ExprType::SUBQUERY) {
+    rc = compare_subquery_left(right_value, bool_value);
+  }else if(right_->type() == ExprType::SUBQUERY) {
+    rc = compare_subquery_right(left_value, bool_value);
+  }else if(left_ -> type() == ExprType::VALUELIST) {
+    rc = compare_valuelist(true, right_value, bool_value);
+  }else if(right_-> type() == ExprType::VALUELIST) {
+    rc = compare_valuelist(false, left_value, bool_value);
+  }
+  else {
+    rc = compare_value(left_value, right_value, bool_value);
+  }
+  if (rc == RC::SUCCESS) {
+    value.set_boolean(bool_value);
+  }
+  return rc;
+}
+
 
 RC ComparisonExpr::compare_subquery_left(const Value &right, bool &value) const {
   SubQueryExpr* subquery_expr = dynamic_cast<SubQueryExpr*>(left_.get());
@@ -573,6 +639,61 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
   return rc;
 }
 
+RC ConjunctionExpr::get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const
+{
+  RC rc = RC::SUCCESS;
+
+  Value left_value;
+  rc = left_->get_value(tuple1, tuple2, left_value);
+  if (rc == RC::INVALID_ARGUMENT) {
+    LOG_DEBUG("divide by zero!");
+    left_value.set_boolean(false);
+    rc = RC::SUCCESS;
+  }else if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value by left child expression. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  if(conjunction_type_ == Type::AND) {
+    if(left_value.get_boolean() == true) {
+      Value right_value;
+      rc = right_->get_value(tuple1, tuple2, right_value);
+      if (rc == RC::INVALID_ARGUMENT) {
+        LOG_DEBUG("divide by zero!");
+        right_value.set_boolean(false);
+        rc =   RC::SUCCESS;
+      }else if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get value by right child expression. rc=%s", strrc(rc));
+        return rc;
+      }
+      value.set_boolean(right_value.get_boolean());
+    }else {
+      value.set_boolean(false);
+    }
+  }else if(conjunction_type_ == Type::OR) {
+    if(left_value.get_boolean() == false) {
+      Value right_value;
+      rc = right_->get_value(tuple1, tuple2, right_value);
+      if (rc == RC::INVALID_ARGUMENT) {
+        LOG_DEBUG("divide by zero!");
+        right_value.set_boolean(false);
+        rc = RC::SUCCESS;
+      }else if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get value by right child expression. rc=%s", strrc(rc));
+        return rc;
+      }
+      value.set_boolean(right_value.get_boolean());
+    }else {
+      value.set_boolean(true);
+    }
+  }else {
+    LOG_ERROR("unsupported conjunction type %d", conjunction_type_);
+    return  RC::INTERNAL;
+  }
+
+  return rc;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 ArithmeticExpr::ArithmeticExpr(ArithmeticExpr::Type type, Expression *left, Expression *right)
@@ -754,12 +875,37 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
       LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
       return rc;
     }
-  }else {
+  } else {
     right_value.set_value(Value(0));
   }
 
   return calc_value(left_value, right_value, value);
 }
+
+RC ArithmeticExpr::get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const{
+  RC rc = RC::SUCCESS;
+
+  Value left_value;
+  Value right_value;
+
+  rc = left_->get_value(tuple1, tuple2, left_value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+    return rc;
+  }
+  if(right_ != nullptr) {
+    rc = right_->get_value(tuple1, tuple2, right_value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  } else {
+    right_value.set_value(Value(0));
+  }
+
+  return calc_value(left_value, right_value, value);
+}
+
 
 RC ArithmeticExpr::get_column(Chunk &chunk, Column &column)
 {
@@ -898,6 +1044,11 @@ RC AggregateExpr::get_value(const Tuple &tuple, Value &value) const
   return tuple.find_cell(TupleCellSpec(name()), value);
 }
 
+RC AggregateExpr::get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const{
+  return tuple1.find_cell(TupleCellSpec(name()), value);
+}
+
+
 RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &type)
 {
   RC rc = RC::SUCCESS;
@@ -920,17 +1071,85 @@ RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &ty
 SubQueryExpr::SubQueryExpr(SelectSqlNode select_sql_node)
   : select_sql_node_(std::move(select_sql_node))
 {
-  this->sub_query_result = std::vector<Value>();
+  this->sub_query_result = new std::vector<Value>();
+  this->has_result = new bool(false);
+  this->rewiter_failure_ = new bool(false);
 }
 
+unique_ptr<PhysicalOperator> physical_operator = nullptr; // 受不了了
 RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const {
-  if(this->sub_query_result.size() == 0) {
-    value.set_null();
+  RC rc = RC::SUCCESS;
+  if(!this->get_rewiter_failure()) {
+    if(this->sub_query_result -> size() == 0) {
+      value.set_null();
+    }else {
+      value.set_value(this->sub_query_result -> front());
+    }
+    return RC::SUCCESS;
   }else {
-    value.set_value(this->sub_query_result[0]);
+    if(physical_operator == nullptr) {
+      unique_ptr<LogicalOperator> logical_plan = nullptr;
+      rc = LogicalPlanGenerator::create(this->select_stmt_, logical_plan);
+      PhysicalPlanGenerator::create(*logical_plan, physical_operator);
+      LOG_INFO("subquery_physical_operator type: %d", physical_operator->type());
+    }
+
+    Tuple *tuple_temp         = nullptr;
+    physical_operator->open(nullptr);
+    while (true) {
+      rc = physical_operator->next(tuple);
+      if (RC::SUCCESS != rc) {
+        if(rc == RC::RECORD_EOF) {
+          LOG_INFO("subquery rewite succeed!");
+          this->set_has_result();
+        }
+        physical_operator->close();
+        break;
+      }
+      tuple_temp = physical_operator->current_tuple();
+      Value value;
+      tuple_temp->cell_at(0, value);
+      this->add_result(value);
+    }
+    return RC::SUCCESS;
   }
+}
+
+RC SubQueryExpr::get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const{
+  RC rc = RC::SUCCESS;
+  if(!this->get_rewiter_failure()) {
+    if(this->sub_query_result -> size() == 0) {
+      value.set_null();
+    }else {
+      value.set_value(this->sub_query_result -> front());
+    }
+    return RC::SUCCESS;
+  }else {
+    std::unique_ptr<PhysicalOperator> subquery_physical_operator = nullptr;
+    PhysicalPlanGenerator::create(*logical_plan_, subquery_physical_operator);
+    LOG_INFO("subquery_physical_operator type: %d", subquery_physical_operator->type());
+    Tuple *tuple_temp         = nullptr;
+    subquery_physical_operator->open(nullptr);
+    while (true) {
+      rc = subquery_physical_operator->next(tuple2);
+      if (RC::SUCCESS != rc) {
+        if(rc == RC::RECORD_EOF) {
+          LOG_INFO("subquery rewite succeed!");
+          this->set_has_result();
+        }
+        subquery_physical_operator->close();
+        break;
+      }
+      tuple_temp = subquery_physical_operator->current_tuple();
+      Value value;
+      tuple_temp->cell_at(0, value);
+      this->add_result(value);
+    }
+  }
+
   return RC::SUCCESS;
 }
+
 
 AttrType SubQueryExpr::value_type() const{
   auto stmt = dynamic_cast<SelectStmt*>(this->select_stmt_);
@@ -956,11 +1175,10 @@ RC SubQueryExpr::LogicalPlanGenerate(){
   return RC::SUCCESS;
 }
 
-RC SubQueryExpr::add_table_map(std::unordered_map<std::string, Table*> &table_map)
+bool SubQueryExpr::add_table_map(std::unordered_map<std::string, Table*> &table_map)
 {
   auto select_stmt = dynamic_cast<SelectStmt*>(this->select_stmt_);
-  select_stmt->add_table_map(table_map);
-  return RC::SUCCESS;
+  return select_stmt->add_table_map(table_map);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -976,6 +1194,16 @@ RC ValueListExpr::get_value(const Tuple &tuple, Value &value) const {
     value.set_value(this->value_list_[0]);
   }
   return RC::SUCCESS;
+}
+
+RC ValueListExpr::get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const{
+  if(this->value_list_.size() == 0) {
+    value.set_null();
+  }else {
+    value.set_value(this->value_list_[0]);
+  }
+  return RC::SUCCESS;
+
 }
 
 AttrType ValueListExpr::value_type() const
@@ -1021,6 +1249,26 @@ RC FuncExpr::get_value(const Tuple &tuple, Value &value) const{
     break;
   }
   default: break;
+  }
+  return rc;
+}
+
+RC FuncExpr::get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const{
+  RC rc = RC::SUCCESS;
+  switch (func_type_) {
+    case LENGTH: {
+      rc = get_length_value(tuple1, value);
+      break;
+    }
+    case ROUND: {
+      rc = get_round_value(tuple1, value);
+      break;
+    }
+    case DATE_FORMAT: {
+      rc = get_date_format_value(tuple1, value);
+      break;
+    }
+    default: break;
   }
   return rc;
 }

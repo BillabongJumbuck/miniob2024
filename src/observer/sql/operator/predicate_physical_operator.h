@@ -34,6 +34,7 @@ public:
 
   RC open(Trx *trx) override;
   RC next() override;
+  RC next(const Tuple &tuple) override;
   RC close() override;
 
   Tuple *current_tuple() override;

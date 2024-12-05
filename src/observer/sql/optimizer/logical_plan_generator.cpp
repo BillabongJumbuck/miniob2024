@@ -258,7 +258,9 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
   }else if(left_child-> type() == ExprType::SUBQUERY) {
     auto subquery_expr = dynamic_cast<SubQueryExpr*>(left_child.get());
     rc = subquery_expr->Create_stmt(db);
-    subquery_expr->add_table_map(table_map);
+    if(subquery_expr->add_table_map(table_map)) {
+      subquery_expr -> set_rewrite_failure();
+    };
     // 判断rc
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to process subquery expression. rc=%s", strrc(rc));
@@ -300,7 +302,9 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
   }else if(right_child-> type() == ExprType::SUBQUERY) {
     auto subquery_expr = dynamic_cast<SubQueryExpr*>(right_child.get());
     rc = subquery_expr->Create_stmt(db);
-    subquery_expr->add_table_map(table_map);
+    if(subquery_expr->add_table_map(table_map)) {
+      subquery_expr -> set_rewrite_failure();
+    }
     // 判断rc
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to process subquery expression. rc=%s", strrc(rc));

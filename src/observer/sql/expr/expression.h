@@ -82,6 +82,7 @@ public:
    * @brief 根据具体的tuple，来计算当前表达式的值。tuple有可能是一个具体某个表的行数据
    */
   virtual RC get_value(const Tuple &tuple, Value &value) const = 0;
+  virtual RC get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const {return RC::UNIMPLEMENTED;}
 
   /**
    * @brief 在没有实际运行的情况下，也就是无法获取tuple的情况下，尝试获取表达式的值
@@ -218,6 +219,7 @@ public:
   RC get_column(Chunk &chunk, Column &column) override;
 
   RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const override;
 
 private:
   Field field_;
@@ -238,6 +240,7 @@ public:
   bool equal(const Expression &other) const override;
 
   RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const override;
   RC get_column(Chunk &chunk, Column &column) override;
   RC try_get_value(Value &value) const override
   {
@@ -269,6 +272,7 @@ public:
   ExprType type() const override { return ExprType::CAST; }
 
   RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const override;
 
   RC try_get_value(Value &value) const override;
 
@@ -297,6 +301,7 @@ public:
 
   ExprType type() const override { return ExprType::COMPARISON; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
+  RC       get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const override;
   AttrType value_type() const override { return AttrType::BOOLEANS; }
   CompOp   comp() const { return comp_; }
 
@@ -361,6 +366,7 @@ public:
   ExprType type() const override { return ExprType::CONJUNCTION; }
   AttrType value_type() const override { return AttrType::BOOLEANS; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
+  RC       get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const override;
 
   Type conjunction_type() const { return conjunction_type_; }
 
@@ -411,6 +417,7 @@ public:
   };
 
   RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const override;
 
   RC get_column(Chunk &chunk, Column &column) override;
 
@@ -480,6 +487,7 @@ public:
   int      value_length() const override { return child_->value_length(); }
 
   RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const override;
 
   RC get_column(Chunk &chunk, Column &column) override;
 
@@ -506,28 +514,30 @@ public:
   virtual ~SubQueryExpr() = default;
   ExprType type() const override { return ExprType::SUBQUERY; }
   RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const override;
   AttrType value_type() const override;
 
   SelectSqlNode& select_sql_node() { return select_sql_node_; }
   Stmt* select_stmt() { return select_stmt_; }
   unique_ptr<LogicalOperator> &logical_plan() { return logical_plan_; }
-  void add_result(const Value& value) { sub_query_result.push_back(value); }
-  vector<Value>& get_result_vector() { return sub_query_result; }
-  void set_has_result() { has_result = true; }
-  bool has_result_vector() { return has_result; }
-
+  void add_result(const Value& value) const { (*sub_query_result).push_back(value); }
+  vector<Value>& get_result_vector() { return *sub_query_result; }
+  void set_has_result()const { *has_result = true; }
+  bool has_result_vector()const { return *has_result; }
+  void set_rewrite_failure()const { *rewiter_failure_ = true; }
+  bool get_rewiter_failure() const { return *rewiter_failure_; }
 
   RC Create_stmt(Db *db);
   RC LogicalPlanGenerate();
-  RC add_table_map(std::unordered_map<std::string, Table*> &table_map);
+  bool add_table_map(std::unordered_map<std::string, Table*> &table_map);
 
 private:
-
   SelectSqlNode select_sql_node_;
   Stmt *select_stmt_;
   unique_ptr<LogicalOperator> logical_plan_ = nullptr;
-  std::vector<Value> sub_query_result;
-  bool has_result = false;
+  std::vector<Value> *sub_query_result;
+  bool *has_result = nullptr;
+  bool *rewiter_failure_ = nullptr;
 };
 
 class ValueListExpr : public Expression
@@ -537,6 +547,7 @@ public:
   virtual ~ValueListExpr() = default;
   ExprType type() const override { return ExprType::VALUELIST; }
   RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const override;
   AttrType value_type() const override;
 
   void add_value(const Value &value) { value_list_.push_back(value); }
@@ -564,6 +575,7 @@ public:
   ExprType type() const override { return ExprType::FUNCTION; }
 
   RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const override;
 
   FuncType func_type() const { return func_type_; }
   std::vector<std::unique_ptr<Expression>>& get_child() { return child_; }

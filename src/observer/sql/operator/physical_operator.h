@@ -80,6 +80,7 @@ public:
   virtual RC open(Trx *trx) = 0;
   virtual RC next() { return RC::UNIMPLEMENTED; }
   virtual RC next(Chunk &chunk) { return RC::UNIMPLEMENTED; }
+  virtual RC next(const Tuple& tuple) { return RC::UNIMPLEMENTED; }
   virtual RC close() = 0;
 
   virtual Tuple *current_tuple() { return nullptr; }

@@ -128,12 +128,15 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   return RC::SUCCESS;
 }
 
-void SelectStmt::add_table_map(std::unordered_map<std::string, Table *> &table_map){
+bool SelectStmt::add_table_map(std::unordered_map<std::string, Table *> &table_map){
+  bool res = false;
   // 添加表映射，先检查是否重复
   for(auto table : table_map) {
     if(table_map_.find(table.first) == table_map_.end()) {
       table_map_.insert({table.first, table.second});
+      res = true;
     }
   }
+  return res;
 }
 

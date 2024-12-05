@@ -51,6 +51,18 @@ RC ProjectPhysicalOperator::next()
   return children_[0]->next();
 }
 
+RC ProjectPhysicalOperator::next(const Tuple &tuple)
+{
+  if(children_.empty() && !expressions_.empty()) {
+    return RC::SELECT_NO_TABLE;
+  }
+  if (children_.empty()) {
+    return RC::RECORD_EOF;
+  }
+  return children_[0]->next(tuple);
+}
+
+
 RC ProjectPhysicalOperator::close()
 {
   if (!children_.empty()) {

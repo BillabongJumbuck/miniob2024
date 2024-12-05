@@ -59,6 +59,32 @@ RC PredicatePhysicalOperator::next()
   return rc;
 }
 
+RC PredicatePhysicalOperator::next(const Tuple& tuple2)
+{
+  RC                rc   = RC::SUCCESS;
+  PhysicalOperator *oper = children_.front().get();
+
+  while (RC::SUCCESS == (rc = oper->next())) {
+    Tuple *tuple1 = oper->current_tuple();
+    if (nullptr == tuple1) {
+      rc = RC::INTERNAL;
+      LOG_WARN("failed to get tuple from operator");
+      break;
+    }
+
+    Value value;
+    rc = expression_->get_value(*tuple1, tuple2, value);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+
+    if (value.get_boolean()) {
+      return rc;
+    }
+  }
+  return rc;
+}
+
 RC PredicatePhysicalOperator::close()
 {
   children_[0]->close();
