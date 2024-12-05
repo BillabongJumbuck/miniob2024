@@ -5,6 +5,7 @@
 #include "subquery_simplification_rule.h"
 
 #include "physical_plan_generator.h"
+#include "logical_plan_generator.h"
 #include "common/log/log.h"
 #include "sql/expr/expression.h"
 #include "common/helper.h"
@@ -17,8 +18,13 @@ RC SubQuerySimplificationRule::rewrite(std::unique_ptr<Expression> &expr, bool &
   if (expr->type() == ExprType::SUBQUERY) {
     SubQueryExpr *subquery_expr = dynamic_cast<SubQueryExpr *>(expr.get());
     if(!subquery_expr->has_result_vector() && !subquery_expr->get_rewiter_failure()) {
-      subquery_expr->LogicalPlanGenerate();
-      PhysicalPlanGenerator::create(*subquery_expr->logical_plan(), po_in_helper);
+      LogicalPlanGenerator::create(subquery_expr->select_stmt(), lo_in_helper);
+      if(use_extra_table_map) {
+        LOG_INFO("use extra_ table _ map");
+        subquery_expr->set_rewrite_failure();
+        return RC::SUCCESS;
+      }
+      PhysicalPlanGenerator::create(*lo_in_helper, po_in_helper);
       LOG_INFO("subquery_physical_operator type: %d", po_in_helper->type());
       Tuple *tuple         = nullptr;
       po_in_helper->open(nullptr);

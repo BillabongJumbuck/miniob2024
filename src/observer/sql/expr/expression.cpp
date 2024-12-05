@@ -1089,9 +1089,7 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const {
     return RC::SUCCESS;
   }else {
     if(po_in_helper == nullptr) {
-      unique_ptr<LogicalOperator> logical_plan = nullptr;
-      rc = LogicalPlanGenerator::create(this->select_stmt_, logical_plan);
-      PhysicalPlanGenerator::create(*logical_plan, po_in_helper);
+      PhysicalPlanGenerator::create(*lo_in_helper, po_in_helper);
       LOG_INFO("subquery_physical_operator type: %d", po_in_helper->type());
     }
 
@@ -1117,38 +1115,7 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const {
 }
 
 RC SubQueryExpr::get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const{
-  RC rc = RC::SUCCESS;
-  if(!this->get_rewiter_failure()) {
-    if(this->sub_query_result -> size() == 0) {
-      value.set_null();
-    }else {
-      value.set_value(this->sub_query_result -> front());
-    }
-    return RC::SUCCESS;
-  }else {
-    std::unique_ptr<PhysicalOperator> subquery_physical_operator = nullptr;
-    PhysicalPlanGenerator::create(*logical_plan_, subquery_physical_operator);
-    LOG_INFO("subquery_physical_operator type: %d", subquery_physical_operator->type());
-    Tuple *tuple_temp         = nullptr;
-    subquery_physical_operator->open(nullptr);
-    while (true) {
-      rc = subquery_physical_operator->next(tuple2);
-      if (RC::SUCCESS != rc) {
-        if(rc == RC::RECORD_EOF) {
-          LOG_INFO("subquery rewite succeed!");
-          this->set_has_result();
-        }
-        subquery_physical_operator->close();
-        break;
-      }
-      tuple_temp = subquery_physical_operator->current_tuple();
-      Value value;
-      tuple_temp->cell_at(0, value);
-      this->add_result(value);
-    }
-  }
-
-  return RC::SUCCESS;
+  return RC::UNIMPLEMENTED;
 }
 
 

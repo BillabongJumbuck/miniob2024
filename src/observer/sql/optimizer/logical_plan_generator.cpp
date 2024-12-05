@@ -41,6 +41,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression_iterator.h"
 #include "sql/operator/update_logical_operator.h"
 
+#include "common/helper.h"
+
 using namespace std;
 using namespace common;
 
@@ -240,6 +242,10 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
       table = default_table;
     }else {
       table = table_map[unbound_expr->table_name()];
+      if(table == nullptr) {
+        table = extra_table_map[unbound_expr->table_name()];
+        use_extra_table_map = true;
+      }
     }
     const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
     // field不存在，返回错误
@@ -258,9 +264,9 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
   }else if(left_child-> type() == ExprType::SUBQUERY) {
     auto subquery_expr = dynamic_cast<SubQueryExpr*>(left_child.get());
     rc = subquery_expr->Create_stmt(db);
-    if(subquery_expr->add_table_map(table_map)) {
-      // subquery_expr -> set_rewrite_failure();
-    };
+    for(auto iter = table_map.begin(); iter != table_map.end(); iter++) {
+      extra_table_map.insert({iter->first, iter->second});
+    }
     // 判断rc
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to process subquery expression. rc=%s", strrc(rc));
@@ -279,11 +285,15 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
   std::unique_ptr<Expression> right_child = std::move(expr->right());
   if(right_child->type() == ExprType::UNBOUND_FIELD) {
     UnboundFieldExpr* unbound_expr = dynamic_cast<UnboundFieldExpr*>(right_child.get());
-    Table *table;
+    Table *table = nullptr;
     if(unbound_expr->table_name() == nullptr || unbound_expr->table_name()[0] == '\0') {
       table = default_table;
     }else {
       table = table_map[unbound_expr->table_name()];
+      if(table == nullptr) {
+        table = extra_table_map[unbound_expr->table_name()];
+        use_extra_table_map = true;
+      }
     }
     const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
     // field不存在，返回错误
@@ -302,8 +312,8 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
   }else if(right_child-> type() == ExprType::SUBQUERY) {
     auto subquery_expr = dynamic_cast<SubQueryExpr*>(right_child.get());
     rc = subquery_expr->Create_stmt(db);
-    if(subquery_expr->add_table_map(table_map)) {
-      // subquery_expr -> set_rewrite_failure();
+    for(auto iter = table_map.begin(); iter != table_map.end(); iter++) {
+      extra_table_map.insert({iter->first, iter->second});
     }
     // 判断rc
     if(OB_FAIL(rc)) {
@@ -382,11 +392,15 @@ RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default
   // 如果是unbound_field，则需要替换为field_expr
   if(left_child->type() == ExprType::UNBOUND_FIELD) {
     UnboundFieldExpr* unbound_expr = dynamic_cast<UnboundFieldExpr*>(left_child.get());
-    Table *table;
+    Table *table = nullptr;
     if(unbound_expr->table_name() == nullptr || unbound_expr->table_name()[0] == '\0') {
       table = default_table;
     }else {
       table = table_map[unbound_expr->table_name()];
+      if(table == nullptr) {
+        table = extra_table_map[unbound_expr->table_name()];
+        use_extra_table_map = true;
+      }
     }
     const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
     // field不存在，返回错误
@@ -417,11 +431,15 @@ RC LogicalPlanGenerator::arithmetic_process(ArithmeticExpr *expr, Table *default
     right_child = std::move(expr->right());
     if(right_child->type() == ExprType::UNBOUND_FIELD) {
       UnboundFieldExpr* unbound_expr = dynamic_cast<UnboundFieldExpr*>(right_child.get());
-      Table *table;
+      Table *table = nullptr;
       if(unbound_expr->table_name() == nullptr || unbound_expr->table_name()[0] == '\0') {
         table = default_table;
       }else {
         table = table_map[unbound_expr->table_name()];
+        if(table == nullptr) {
+          table = extra_table_map[unbound_expr->table_name()];
+          use_extra_table_map = true;
+        }
       }
       const FieldMeta *field_meta = table->table_meta().field(unbound_expr->field_name());
       // field不存在，返回错误
@@ -502,7 +520,7 @@ RC LogicalPlanGenerator::func_expr_process(FuncExpr *expr, Table *default_table,
     std::unique_ptr<Expression> child = std::move(expr->get_child()[i]);
     if (child->type() == ExprType::UNBOUND_FIELD) {
       UnboundFieldExpr* unbound_expr = dynamic_cast<UnboundFieldExpr*>(child.get());
-      Table *table;
+      Table *table = nullptr;
       if(unbound_expr->table_name() == nullptr || unbound_expr->table_name()[0] == '\0') {
         table = default_table;
       }else {
