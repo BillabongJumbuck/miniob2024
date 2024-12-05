@@ -677,6 +677,9 @@ expression:
     | '*' {
       $$ = new StarExpr();
     }
+    | ID DOT '*'{
+      $$ = new StarExpr($1);
+    }
     | func_expr {
       $$ = $1; // FuncExpr
     }
