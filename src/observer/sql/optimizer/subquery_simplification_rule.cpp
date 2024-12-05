@@ -7,6 +7,7 @@
 #include "physical_plan_generator.h"
 #include "common/log/log.h"
 #include "sql/expr/expression.h"
+#include "common/helper.h"
 
 RC SubQuerySimplificationRule::rewrite(std::unique_ptr<Expression> &expr, bool &change_made)
 {
@@ -17,13 +18,12 @@ RC SubQuerySimplificationRule::rewrite(std::unique_ptr<Expression> &expr, bool &
     SubQueryExpr *subquery_expr = dynamic_cast<SubQueryExpr *>(expr.get());
     if(!subquery_expr->has_result_vector() && !subquery_expr->get_rewiter_failure()) {
       subquery_expr->LogicalPlanGenerate();
-      std::unique_ptr<PhysicalOperator> subquery_physical_operator = nullptr;
-      PhysicalPlanGenerator::create(*subquery_expr->logical_plan(), subquery_physical_operator);
-      LOG_INFO("subquery_physical_operator type: %d", subquery_physical_operator->type());
+      PhysicalPlanGenerator::create(*subquery_expr->logical_plan(), po_in_helper);
+      LOG_INFO("subquery_physical_operator type: %d", po_in_helper->type());
       Tuple *tuple         = nullptr;
-      subquery_physical_operator->open(nullptr);
+      po_in_helper->open(nullptr);
       while (true) {
-        rc = subquery_physical_operator->next();
+        rc = po_in_helper->next();
         if (RC::SUCCESS != rc) {
           if(rc == RC::RECORD_EOF) {
             LOG_INFO("subquery rewite succeed!");
@@ -33,10 +33,10 @@ RC SubQuerySimplificationRule::rewrite(std::unique_ptr<Expression> &expr, bool &
             LOG_INFO("subquery rewite failed!");
             subquery_expr->set_rewrite_failure();
           }
-          subquery_physical_operator->close();
+          po_in_helper->close();
           break;
         }
-        tuple = subquery_physical_operator->current_tuple();
+        tuple = po_in_helper->current_tuple();
         Value value;
         tuple->cell_at(0, value);
         subquery_expr->add_result(value);

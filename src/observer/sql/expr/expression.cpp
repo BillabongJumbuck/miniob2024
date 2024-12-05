@@ -1068,6 +1068,7 @@ RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &ty
   return rc;
 }
 
+////////////////////////////////////////////////////////////////////////////////
 SubQueryExpr::SubQueryExpr(SelectSqlNode select_sql_node)
   : select_sql_node_(std::move(select_sql_node))
 {
@@ -1076,7 +1077,7 @@ SubQueryExpr::SubQueryExpr(SelectSqlNode select_sql_node)
   this->rewiter_failure_ = new bool(false);
 }
 
-unique_ptr<PhysicalOperator> physical_operator = nullptr; // 受不了了
+#include "common/helper.h"
 RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const {
   RC rc = RC::SUCCESS;
   if(!this->get_rewiter_failure()) {
@@ -1087,26 +1088,26 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const {
     }
     return RC::SUCCESS;
   }else {
-    if(physical_operator == nullptr) {
+    if(po_in_helper == nullptr) {
       unique_ptr<LogicalOperator> logical_plan = nullptr;
       rc = LogicalPlanGenerator::create(this->select_stmt_, logical_plan);
-      PhysicalPlanGenerator::create(*logical_plan, physical_operator);
-      LOG_INFO("subquery_physical_operator type: %d", physical_operator->type());
+      PhysicalPlanGenerator::create(*logical_plan, po_in_helper);
+      LOG_INFO("subquery_physical_operator type: %d", po_in_helper->type());
     }
 
     Tuple *tuple_temp         = nullptr;
-    physical_operator->open(nullptr);
+    po_in_helper->open(nullptr);
     while (true) {
-      rc = physical_operator->next(tuple);
+      rc = po_in_helper->next(tuple);
       if (RC::SUCCESS != rc) {
         if(rc == RC::RECORD_EOF) {
           LOG_INFO("subquery rewite succeed!");
           this->set_has_result();
         }
-        physical_operator->close();
+        po_in_helper->close();
         break;
       }
-      tuple_temp = physical_operator->current_tuple();
+      tuple_temp = po_in_helper->current_tuple();
       Value value;
       tuple_temp->cell_at(0, value);
       this->add_result(value);

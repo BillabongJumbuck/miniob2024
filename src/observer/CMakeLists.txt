@@ -23,7 +23,8 @@ FOREACH (F ${ALL_SRC})
                 common/type/null_type.cpp
                 common/type/null_type.h
                 sql/optimizer/subquery_simplification_rule.cpp
-                sql/optimizer/subquery_simplification_rule.h)
+                sql/optimizer/subquery_simplification_rule.h
+                common/helper.h)
         MESSAGE("Use " ${F})
     ENDIF()
 

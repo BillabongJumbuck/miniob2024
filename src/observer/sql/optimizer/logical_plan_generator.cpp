@@ -259,7 +259,7 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
     auto subquery_expr = dynamic_cast<SubQueryExpr*>(left_child.get());
     rc = subquery_expr->Create_stmt(db);
     if(subquery_expr->add_table_map(table_map)) {
-      subquery_expr -> set_rewrite_failure();
+      // subquery_expr -> set_rewrite_failure();
     };
     // 判断rc
     if(OB_FAIL(rc)) {
@@ -303,7 +303,7 @@ RC LogicalPlanGenerator::comparison_process(ComparisonExpr *expr, Table *default
     auto subquery_expr = dynamic_cast<SubQueryExpr*>(right_child.get());
     rc = subquery_expr->Create_stmt(db);
     if(subquery_expr->add_table_map(table_map)) {
-      subquery_expr -> set_rewrite_failure();
+      // subquery_expr -> set_rewrite_failure();
     }
     // 判断rc
     if(OB_FAIL(rc)) {
