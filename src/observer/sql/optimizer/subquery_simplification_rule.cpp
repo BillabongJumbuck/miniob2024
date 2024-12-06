@@ -18,7 +18,11 @@ RC SubQuerySimplificationRule::rewrite(std::unique_ptr<Expression> &expr, bool &
   if (expr->type() == ExprType::SUBQUERY) {
     SubQueryExpr *subquery_expr = dynamic_cast<SubQueryExpr *>(expr.get());
     if(!subquery_expr->has_result_vector() && !subquery_expr->get_rewiter_failure()) {
-      LogicalPlanGenerator::create(subquery_expr->select_stmt(), lo_in_helper);
+      rc = LogicalPlanGenerator::create(subquery_expr->select_stmt(), lo_in_helper);
+      if(rc != RC::SUCCESS) {
+        LOG_WARN("failed to create logical plan for subquery");
+        return rc;
+      }
       if(use_extra_table_map) {
         LOG_INFO("use extra_ table _ map");
         subquery_expr->set_rewrite_failure();
