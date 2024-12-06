@@ -44,9 +44,7 @@ RC OrderByPhysicalOperator::open(Trx *trx)
   }
 
   if (OB_SUCC(rc)) {
-    std::sort(tuples_.begin(), tuples_.end(), [this](Tuple* a, Tuple* b) {
-      return this->compare(a, b) < 0;
-    });
+    heap_sort();
   }
 
   return RC::SUCCESS;
@@ -74,14 +72,13 @@ RC OrderByPhysicalOperator::heap_sort()
 {
   RC rc = RC::SUCCESS;
   int i;
-  print();
+
   for(i = tuples_.size()/2; i>=0; i--) {
     rc = PercDown(i);
     if(rc != RC::SUCCESS) {
       LOG_INFO("failed to heap sort. rc=%s", strrc(rc));
       return rc;
     }
-    print();
   }
 
   for(i = tuples_.size()-1; i>0; i--) {
@@ -93,7 +90,6 @@ RC OrderByPhysicalOperator::heap_sort()
       LOG_INFO("failed to heap sort. rc=%s", strrc(rc));
       return rc;
     }
-    print();
   }
   return rc;
 }
@@ -143,13 +139,5 @@ int OrderByPhysicalOperator::compare(Tuple *a, Tuple *b)
     }
   }
   return 0;
-}
-
-void OrderByPhysicalOperator::print()
-{
-  for(auto &tuple : tuples_) {
-    cout << tuple->to_string() << endl;
-  }
-  cout << endl;
 }
 

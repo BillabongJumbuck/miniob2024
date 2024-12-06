@@ -56,10 +56,8 @@ RC TableScanPhysicalOperator::close() { return record_scanner_.close_scan(); }
 
 Tuple *TableScanPhysicalOperator::current_tuple()
 {
-  std::unique_ptr<RowTuple> new_tuple(new RowTuple());
-  new_tuple->set_schema(table_, table_->table_meta().field_metas());
-  new_tuple->set_record(new Record(current_record_));
-  return new_tuple.release();
+  tuple_.set_record(&current_record_);
+  return &tuple_;
 }
 
 string TableScanPhysicalOperator::param() const { return table_->name(); }

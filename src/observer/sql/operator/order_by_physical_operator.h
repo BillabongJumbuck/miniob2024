@@ -35,7 +35,6 @@ private:
   RC heap_sort();
   RC PercDown(int index);
   int compare(Tuple *tuple1, Tuple *tuple2);
-  void print();
 
 private:
   std::vector<int> is_asc_;  // 0: desc, 1: asc
