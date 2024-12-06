@@ -116,6 +116,10 @@ RC ExpressionBinder::bind_star_expression(
     return RC::SUCCESS;
   }
 
+  if(expr->has_alias()) {
+    LOG_WARN("alias is not allowed for *");
+    return RC::INTERNAL;
+  }
   auto star_expr = static_cast<StarExpr *>(expr.get());
 
   vector<Table *> tables_to_wildcard;
