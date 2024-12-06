@@ -38,9 +38,9 @@ RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
 
 RC FieldExpr::get_value(const Tuple &tuple1, const Tuple &tuple2, Value &value) const
 {
-  RC rc = tuple1.cell_at(field().meta()->field_id(), value);
+  RC rc = tuple1.find_cell(TupleCellSpec(table_name(), field_name()), value);
   if(OB_FAIL(rc)) {
-    rc = tuple2.cell_at(field().meta()->field_id(), value);
+    rc = tuple2.find_cell(TupleCellSpec(table_name(), field_name()), value);
     return rc;
   }
   return rc;
