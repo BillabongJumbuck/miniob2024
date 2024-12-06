@@ -50,6 +50,16 @@ struct TableWithAlias
 };
 
 /**
+ *@brief 描述一个order by的属性
+ *@ingroup SQLParser
+ */
+struct OrderAttrSqlNode
+{
+  RelAttrSqlNode  attr;
+  bool            is_asc;
+};
+
+/**
  * @brief 描述一个inner join语句
  * @ingroup SQLParser
  */
@@ -119,6 +129,7 @@ struct SelectSqlNode
   std::vector<std::unique_ptr<Expression>> expressions;  ///< 查询的表达式
   std::vector<InnerJoinSqlNode>            relations;    ///< 查询的表
   Expression*                              conditions = nullptr;   ///< 查询条件
+  std::vector<OrderAttrSqlNode>            order_by;     ///< order by clause
   std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
 };
 

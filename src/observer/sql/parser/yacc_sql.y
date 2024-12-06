@@ -130,6 +130,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         ROUND
         DATE_FORMAT
         AS
+        ORDER
+        ASC
 
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
@@ -151,6 +153,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<std::string> *                 relation_list;
   InnerJoinSqlNode *                         join;
   TableWithAlias *                           alias;
+  OrderAttrSqlNode *                         orderby_attr;
+  std::vector<OrderAttrSqlNode> *            orderby_list;
   char *                                     string;
   int                                        number;
   float                                      floats;
@@ -193,6 +197,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <string>              alias
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
+%type <orderby_list>        order_by
+%type <orderby_list>        order_by_items
+%type <orderby_attr>        order_by_item
 %type <update_item_ptr>     update_item;
 %type <update_item_list_ptr> update_item_list;
 %type <sql_node>            calc_stmt
@@ -576,7 +583,7 @@ select_stmt:        /*  select 语句的语法解析树*/
         delete $2;
       }
     }
-    | SELECT expression_list FROM from_list where group_by
+    | SELECT expression_list FROM from_list where group_by order_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -597,8 +604,14 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.group_by.swap(*$6);
         delete $6;
       }
+
+      if ($7 != nullptr) {
+        $$->selection.order_by.swap(*$7);
+        delete $7;
+      }
     }
     ;
+
 calc_stmt:
     CALC expression_list
     {
@@ -906,6 +919,55 @@ group_by:
     /* empty */
     {
       $$ = nullptr;
+    }
+    ;
+
+order_by:
+    /* empty*/
+    {
+      $$ = nullptr;
+    }
+    | ORDER BY order_by_items
+    {
+      $$ = $3;
+    }
+    ;
+
+order_by_items:
+    order_by_item {
+      $$ = new std::vector<OrderAttrSqlNode>();
+      $$->push_back(*$1);
+    }
+    | order_by_item COMMA order_by_items
+    {
+        if($3 != nullptr) {
+            $$ = $3;
+        } else {
+            $$ = new std::vector<OrderAttrSqlNode>;
+        }
+
+        $$->insert($$->begin(), *$1);
+    }
+    ;
+
+order_by_item:
+    rel_attr
+    {
+        $$ = new OrderAttrSqlNode;
+        $$->attr = *$1;
+        $$->is_asc = true;
+    }
+    | rel_attr ASC
+    {
+        $$ = new OrderAttrSqlNode;
+        $$->attr = *$1;
+        $$->is_asc = true;
+    }
+    | rel_attr DESC
+    {
+        $$ = new OrderAttrSqlNode;
+        $$->attr = *$1;
+        $$->is_asc = false;
     }
     ;
 load_data_stmt:

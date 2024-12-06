@@ -24,7 +24,11 @@ FOREACH (F ${ALL_SRC})
                 common/type/null_type.h
                 sql/optimizer/subquery_simplification_rule.cpp
                 sql/optimizer/subquery_simplification_rule.h
-                common/helper.h)
+                common/helper.h
+                sql/operator/order_by_logical_operator.cpp
+                sql/operator/order_by_logical_operator.h
+                sql/operator/order_by_physical_operator.cpp
+                sql/operator/order_by_physical_operator.h)
         MESSAGE("Use " ${F})
     ENDIF()
 

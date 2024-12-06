@@ -119,6 +119,42 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   filter_stmt->create(on_conditions, default_table, db);
 
+  // process `order by` statement
+  std::vector<OrderByItem> order_by;
+  for(auto& order : select_sql.order_by) {
+    const char *field_name = order.attr.attribute_name.c_str();
+    const char *table_name = nullptr;
+    Table *table = nullptr;
+    if(field_name == nullptr) {
+      LOG_INFO("invalid argument. field name is null");
+      return RC::INVALID_ARGUMENT;
+    }
+    if(!order.attr.relation_name.empty()) {
+      table_name = order.attr.relation_name.c_str();
+      table = db->find_table(table_name);
+    }else {
+      table = default_table;
+    }
+
+    if(table == nullptr) {
+      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+      return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
+
+    const FieldMeta *field_meta = table->table_meta().field(field_name);
+
+    if (nullptr == field_meta) {
+      LOG_INFO("no such field in table: %s.%s", table_name, field_name);
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+
+    Field      field(table, field_meta);
+    FieldExpr *field_expr = new FieldExpr(field);
+    field_expr->set_name(field_name);
+
+    OrderByItem order_by_item = {std::move(make_unique<FieldExpr>(*field_expr)), order.is_asc};
+    order_by.push_back(std::move(order_by_item));
+  }
 
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
@@ -128,6 +164,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->table_map_ = table_map;
   select_stmt->group_by_.swap(group_by_expressions);
+  select_stmt->order_by_.swap(order_by);
   stmt                      = select_stmt;
   return RC::SUCCESS;
 }

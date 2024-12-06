@@ -35,7 +35,6 @@ RC TableScanPhysicalOperator::next()
   bool filter_result = false;
   while (OB_SUCC(rc = record_scanner_.next(current_record_))) {
     LOG_TRACE("got a record. rid=%s", current_record_.rid().to_string().c_str());
-    
     tuple_.set_record(&current_record_);
     rc = filter(tuple_, filter_result);
     if (rc != RC::SUCCESS) {
@@ -57,8 +56,10 @@ RC TableScanPhysicalOperator::close() { return record_scanner_.close_scan(); }
 
 Tuple *TableScanPhysicalOperator::current_tuple()
 {
-  tuple_.set_record(&current_record_);
-  return &tuple_;
+  std::unique_ptr<RowTuple> new_tuple(new RowTuple());
+  new_tuple->set_schema(table_, table_->table_meta().field_metas());
+  new_tuple->set_record(new Record(current_record_));
+  return new_tuple.release();
 }
 
 string TableScanPhysicalOperator::param() const { return table_->name(); }
