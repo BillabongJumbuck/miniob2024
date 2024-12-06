@@ -64,6 +64,10 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
         table_map.insert({table_name, table});
         if(!select_sql.relations[i].tables[j].alias.empty()) {
           const char *alias = select_sql.relations[i].tables[j].alias.c_str();
+          if(table_map.find(alias) != table_map.end()) {
+            LOG_INFO("duplicate table alias. alias=%s", alias);
+            return RC::INTERNAL;
+          }
           binder_context.add_table(table, alias);
           table_map.insert({alias, table});
         }
