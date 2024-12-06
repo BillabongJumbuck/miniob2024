@@ -181,6 +181,9 @@ RC ExpressionBinder::bind_unbound_field_expression(
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
     field_expr->set_name(field_name);
+    if(unbound_field_expr->has_alias()) {
+      field_expr->set_alias(unbound_field_expr->get_alias());
+    }
     bound_expressions.emplace_back(field_expr);
   }
 
