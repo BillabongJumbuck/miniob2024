@@ -121,6 +121,10 @@ int OrderByPhysicalOperator::compare(Tuple *a, Tuple *b)
     expr->get_value(*a, a_value);
     expr->get_value(*b, b_value);
 
+    if (a_value.is_null() || b_value.is_null()) {
+      return 0;
+    }
+
     int res = a_value.compare(b_value);
     if (res == 0) {
       continue;
