@@ -130,10 +130,10 @@ int OrderByPhysicalOperator::compare(Tuple *a, Tuple *b)
       continue;
     } else if (a_value.is_null()) {
       // a is NULL, treat it as greater in ascending order and smaller in descending order
-      return is_asc_[i] ? 1 : -1;
+      return is_asc_[i] ? -1 : 1;
     } else if (b_value.is_null()) {
       // b is NULL, treat it as greater in ascending order and smaller in descending order
-      return is_asc_[i] ? -1 : 1;
+      return is_asc_[i] ? 1 : -1;
     }
 
     int res = a_value.compare(b_value);
