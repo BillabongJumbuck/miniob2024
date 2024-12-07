@@ -44,7 +44,9 @@ RC OrderByPhysicalOperator::open(Trx *trx)
   }
 
   if (OB_SUCC(rc)) {
-    heap_sort();
+    std::sort(tuples_.begin(), tuples_.end(), [this](Tuple* a, Tuple* b) {
+      return this->compare(a, b) < 0;
+    });
   }
 
   return RC::SUCCESS;
